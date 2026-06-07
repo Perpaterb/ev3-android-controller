@@ -41,11 +41,25 @@ class ControllerControl {
 
   final Map<String, dynamic> config;
 
-  /// User-chosen size multiplier (see [ControllerLayout.setControlScale]).
-  double get scale => (config['scale'] as num?)?.toDouble() ?? 1.0;
+  /// Size multipliers, independent per axis (see
+  /// [ControllerLayout.setControlScale]). Old saves stored one uniform
+  /// 'scale' — it acts as the fallback for both.
+  double get scaleX =>
+      (config['scaleX'] as num?)?.toDouble() ??
+      (config['scale'] as num?)?.toDouble() ??
+      1.0;
+
+  double get scaleY =>
+      (config['scaleY'] as num?)?.toDouble() ??
+      (config['scale'] as num?)?.toDouble() ??
+      1.0;
 
   /// Whether the control's name is drawn on the Run screen.
   bool get showName => config['showName'] != false;
+
+  /// Text size (in stage units) for display controls.
+  double get displayTextSize =>
+      (config['textSize'] as num?)?.toDouble() ?? 24.0;
 
   /// What this control *emits* — pins on the right of the controller node.
   List<PinSpec> get outputPins => switch (kind) {
@@ -305,11 +319,20 @@ class ControllerLayout extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Sets a control's size multiplier, clamped to 50%–200%.
-  void setControlScale(String id, double scale) {
+  /// Sets a control's size multipliers, clamped to 50%–200% per axis.
+  void setControlScale(String id, {double? x, double? y}) {
     final target = control(id);
     if (target == null) return;
-    target.config['scale'] = scale.clamp(0.5, 2.0);
+    if (x != null) target.config['scaleX'] = x.clamp(0.5, 2.0);
+    if (y != null) target.config['scaleY'] = y.clamp(0.5, 2.0);
+    notifyListeners();
+  }
+
+  /// Text size for a display control, clamped to 12–40 stage units.
+  void setDisplayTextSize(String id, double size) {
+    final target = control(id);
+    if (target == null) return;
+    target.config['textSize'] = size.clamp(12.0, 40.0);
     notifyListeners();
   }
 

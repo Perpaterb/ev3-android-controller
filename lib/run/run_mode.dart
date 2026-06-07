@@ -268,8 +268,12 @@ class _RunModeState extends State<RunMode> with WidgetsBindingObserver {
   Widget _buildControl(ControllerControl control, Size stage, double factor) {
     final base = controlBaseSize(control.kind);
     // Stage-unit size scaled to this stage's pixels — identical fraction of
-    // the stage as in the designer miniature.
-    final size = base * control.scale * factor;
+    // the stage as in the designer miniature. Width and height stretch
+    // independently.
+    final size = Size(
+      base.width * control.scaleX * factor,
+      base.height * control.scaleY * factor,
+    );
     final child = switch (control.kind) {
       ControlKind.button => _RunButton(control: control, runner: _runner),
       ControlKind.dpad => _RunDpad(control: control, runner: _runner),
@@ -286,7 +290,7 @@ class _RunModeState extends State<RunMode> with WidgetsBindingObserver {
       width: size.width,
       height: size.height,
       child: FittedBox(
-        fit: BoxFit.contain,
+        fit: BoxFit.fill,
         child:
             SizedBox(width: base.width, height: base.height, child: child),
       ),
@@ -508,7 +512,7 @@ class _RunDisplay extends StatelessWidget {
       children: [
         Container(
           width: 110,
-          height: 44,
+          height: (control.displayTextSize + 16).clamp(44.0, 60.0),
           decoration: BoxDecoration(
             color: Colors.black54,
             borderRadius: BorderRadius.circular(10),
@@ -521,7 +525,7 @@ class _RunDisplay extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 color: PinType.string.color,
-                fontSize: 24,
+                fontSize: control.displayTextSize,
                 fontFamily: 'monospace',
                 fontWeight: FontWeight.bold,
               ),

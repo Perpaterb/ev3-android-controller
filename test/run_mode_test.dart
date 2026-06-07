@@ -167,7 +167,7 @@ void main() {
         position: const Offset(0.3, 0.5));
     final big = addControl(ControlKind.button, 'Big',
         position: const Offset(0.7, 0.5));
-    layout.setControlScale(big.id, 2.0);
+    layout.setControlScale(big.id, x: 2.0, y: 2.0);
     seed();
     await pumpRunMode(tester);
 

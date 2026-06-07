@@ -249,6 +249,37 @@ void main() {
     expect(r.displayValue(readout.id), 'Turbo!');
   });
 
+  test('bool → string says true or false', () {
+    final fast = addControl(ControlKind.toggle, 'Fast');
+    final readout = addControl(ControlKind.display, 'Mode');
+    syncController();
+    final convert = node('text.fromBool');
+    wire(kControllerNodeId, '${fast.id}.state', convert.id, 'value');
+    wire(convert.id, 'result', kControllerNodeId, '${readout.id}.value');
+
+    final r = runner();
+    expect(r.displayValue(readout.id), 'false');
+    r.toggleChanged(fast.id, true);
+    expect(r.displayValue(readout.id), 'true');
+  });
+
+  test('power → string shows 1 while a button is held', () {
+    final go = addControl(ControlKind.button, 'Go');
+    final readout = addControl(ControlKind.display, 'Held');
+    syncController();
+    final latch = node('text.fromPower');
+    wire(kControllerNodeId, '${go.id}.pressed', latch.id, 'set1');
+    wire(kControllerNodeId, '${go.id}.released', latch.id, 'set0');
+    wire(latch.id, 'result', kControllerNodeId, '${readout.id}.value');
+
+    final r = runner();
+    expect(r.displayValue(readout.id), '0'); // nothing pressed yet
+    r.buttonPressed(go.id);
+    expect(r.displayValue(readout.id), '1');
+    r.buttonReleased(go.id);
+    expect(r.displayValue(readout.id), '0');
+  });
+
   test('a display cannot take an int wire directly', () {
     final readout = addControl(ControlKind.display, 'Readout');
     syncController();

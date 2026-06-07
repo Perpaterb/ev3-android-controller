@@ -194,25 +194,55 @@ void main() {
     expect(copy.tabs.single.landscape, isFalse);
   });
 
-  test('control scale defaults to 1, clamps, and persists', () {
+  test('control scales default to 1, clamp, set per axis, and persist', () {
     final control = layout.addControl(
       tabId: layout.tabs.single.id,
       kind: ControlKind.button,
       name: 'Go',
       position: const Offset(0.5, 0.5),
     );
-    expect(control.scale, 1.0);
+    expect(control.scaleX, 1.0);
+    expect(control.scaleY, 1.0);
 
-    layout.setControlScale(control.id, 1.5);
-    expect(control.scale, 1.5);
-    layout.setControlScale(control.id, 99);
-    expect(control.scale, 2.0);
-    layout.setControlScale(control.id, 0.1);
-    expect(control.scale, 0.5);
+    layout.setControlScale(control.id, x: 1.5);
+    expect(control.scaleX, 1.5);
+    expect(control.scaleY, 1.0); // axes are independent
+    layout.setControlScale(control.id, y: 99);
+    expect(control.scaleY, 2.0);
+    layout.setControlScale(control.id, x: 0.1);
+    expect(control.scaleX, 0.5);
 
-    layout.setControlScale(control.id, 1.5);
     final copy = ControllerLayout.fromJson(layout.toJson());
-    expect(copy.control(control.id)!.scale, 1.5);
+    expect(copy.control(control.id)!.scaleX, 0.5);
+    expect(copy.control(control.id)!.scaleY, 2.0);
+  });
+
+  test('a legacy uniform scale feeds both axes', () {
+    final control = layout.addControl(
+      tabId: layout.tabs.single.id,
+      kind: ControlKind.button,
+      name: 'Go',
+      position: const Offset(0.5, 0.5),
+    );
+    control.config['scale'] = 1.5; // written by an older app version
+    expect(control.scaleX, 1.5);
+    expect(control.scaleY, 1.5);
+  });
+
+  test('display text size defaults, clamps and persists', () {
+    final control = layout.addControl(
+      tabId: layout.tabs.single.id,
+      kind: ControlKind.display,
+      name: 'Readout',
+      position: const Offset(0.5, 0.5),
+    );
+    expect(control.displayTextSize, 24.0);
+    layout.setDisplayTextSize(control.id, 99);
+    expect(control.displayTextSize, 40.0);
+    layout.setDisplayTextSize(control.id, 32);
+
+    final copy = ControllerLayout.fromJson(layout.toJson());
+    expect(copy.control(control.id)!.displayTextSize, 32.0);
   });
 
   test('fitAspect letterboxes to the limiting dimension', () {

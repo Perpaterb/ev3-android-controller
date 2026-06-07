@@ -78,6 +78,9 @@ class GraphRunner extends ChangeNotifier {
   /// Live state of stateful controls: sliderId → int, toggleId → bool.
   final Map<String, Object> _controlValues = {};
 
+  /// Per-node runtime state for stateful nodes (Power → String).
+  final Map<String, Object> _nodeState = {};
+
   /// Power chains longer than this are cut — a kid can't build an infinite
   /// loop that hangs the app.
   static const int _maxPowerDepth = 64;
@@ -167,6 +170,8 @@ class GraphRunner extends ChangeNotifier {
       case 'flow.sequence':
         fire('then1');
         fire('then2');
+      case 'text.fromPower':
+        _nodeState[node.id] = inputPin == 'set1' ? '1' : '0';
       default:
         // Pure nodes have no power inputs; nothing to do.
         break;
@@ -207,6 +212,8 @@ class GraphRunner extends ChangeNotifier {
         'text.pick' => flag('condition', false) ? str('a') : str('b'),
         'text.fromInt' => '${input('number', 0)}',
         'text.append' => str('a') + str('b'),
+        'text.fromBool' => flag('value', false) ? 'true' : 'false',
+        'text.fromPower' => _nodeState[node.id] as String? ?? '0',
         'math.add' => input('a', 0) + input('b', 0),
         'math.subtract' => input('a', 0) - input('b', 0),
         'math.multiply' => input('a', 0) * input('b', 0),

@@ -298,8 +298,12 @@ class _ControllerNodeWidgetState extends State<ControllerNodeWidget> {
 
   Widget _buildControl(ControllerControl control, Size stage, double factor) {
     // Stage-unit size scaled to this stage's pixels — identical fraction of
-    // the stage as in Run mode.
-    final size = controlBaseSize(control.kind) * control.scale * factor;
+    // the stage as in Run mode. Width and height stretch independently.
+    final base = controlBaseSize(control.kind);
+    final size = Size(
+      base.width * control.scaleX * factor,
+      base.height * control.scaleY * factor,
+    );
     return Positioned(
       left: control.position.dx * stage.width - size.width / 2,
       top: control.position.dy * stage.height - size.height / 2,
@@ -320,53 +324,69 @@ class _ControllerNodeWidgetState extends State<ControllerNodeWidget> {
           width: size.width,
           height: size.height,
           child: FittedBox(
-            fit: BoxFit.contain,
-            child: _ControlVisual(control: control),
+            fit: BoxFit.fill,
+            child: SizedBox(
+              width: base.width,
+              height: base.height,
+              child: _ControlVisual(control: control),
+            ),
           ),
         ),
       ),
     );
   }
-
 }
 
-/// Miniature, non-interactive rendering of a control for the designer.
+/// Non-interactive replica of how the control looks on the Run screen,
+/// built at the same stage-unit base size — what you design is what you get.
 class _ControlVisual extends StatelessWidget {
   const _ControlVisual({required this.control});
 
   final ControllerControl control;
 
   static const TextStyle _nameStyle =
-      TextStyle(color: Colors.white70, fontSize: 10);
+      TextStyle(color: Colors.white70, fontSize: 12);
+  static const Color _faceColor = Color(0xFF3C4654);
+
+  Widget _arrowPad(IconData icon) => Container(
+        width: 48,
+        height: 48,
+        decoration: BoxDecoration(
+          color: _faceColor,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Icon(icon, color: Colors.white, size: 28),
+      );
 
   @override
   Widget build(BuildContext context) {
     return switch (control.kind) {
       ControlKind.button => Container(
-          width: 72,
-          height: 34,
           decoration: BoxDecoration(
-            color: const Color(0xFF3C4654),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.white24),
+            color: _faceColor,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.white24, width: 2),
           ),
           child: Center(
             child: Text(control.name,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: Colors.white, fontSize: 11)),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                )),
           ),
         ),
-      ControlKind.slider => SizedBox(
-          width: 100,
-          height: 38,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(control.name,
-                  overflow: TextOverflow.ellipsis, style: _nameStyle),
-              const SizedBox(height: 4),
-              Stack(
-                alignment: Alignment.center,
+      ControlKind.slider => Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text('${control.name}: 0',
+                overflow: TextOverflow.ellipsis, style: _nameStyle),
+            const SizedBox(height: 14),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Stack(
+                alignment: Alignment.centerLeft,
                 children: [
                   Container(
                     height: 4,
@@ -376,109 +396,109 @@ class _ControlVisual extends StatelessWidget {
                     ),
                   ),
                   Container(
-                    width: 12,
-                    height: 12,
+                    width: 16,
+                    height: 16,
                     decoration: BoxDecoration(
-                      color: PinType.integer.color,
+                      color: Theme.of(context).colorScheme.primary,
                       shape: BoxShape.circle,
                     ),
                   ),
                 ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
-      ControlKind.toggle => SizedBox(
-          width: 64,
-          height: 38,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(control.name,
-                  overflow: TextOverflow.ellipsis, style: _nameStyle),
-              const SizedBox(height: 3),
-              Container(
-                width: 30,
-                height: 14,
-                decoration: BoxDecoration(
-                  color: Colors.white24,
-                  borderRadius: BorderRadius.circular(7),
+      ControlKind.toggle => Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(control.name,
+                overflow: TextOverflow.ellipsis, style: _nameStyle),
+            const SizedBox(height: 6),
+            Container(
+              width: 48,
+              height: 28,
+              decoration: BoxDecoration(
+                color: Colors.white24,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: const Align(
+                alignment: Alignment.centerLeft,
+                child: Padding(
+                  padding: EdgeInsets.all(2),
+                  child: CircleAvatar(
+                      radius: 12, backgroundColor: Colors.white70),
                 ),
-                child: const Align(
-                  alignment: Alignment.centerLeft,
-                  child: Padding(
-                    padding: EdgeInsets.all(1.5),
-                    child: CircleAvatar(
-                        radius: 5.5, backgroundColor: Colors.white70),
+              ),
+            ),
+          ],
+        ),
+      ControlKind.dpad => Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            _arrowPad(Icons.keyboard_arrow_up),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _arrowPad(Icons.keyboard_arrow_left),
+                SizedBox(
+                  width: 48,
+                  height: 48,
+                  child: Center(
+                    child: Text(control.name,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                        style: _nameStyle),
                   ),
                 ),
-              ),
-            ],
-          ),
+                _arrowPad(Icons.keyboard_arrow_right),
+              ],
+            ),
+            _arrowPad(Icons.keyboard_arrow_down),
+          ],
         ),
-      ControlKind.dpad => SizedBox(
-          width: 64,
-          height: 58,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.control_camera,
-                  size: 36, color: Colors.white54),
-              Text(control.name,
-                  overflow: TextOverflow.ellipsis, style: _nameStyle),
-            ],
-          ),
-        ),
-      ControlKind.light => SizedBox(
-          width: 48,
-          height: 42,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                width: 18,
-                height: 18,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white12,
-                  border: Border.all(color: Colors.white38),
-                ),
+      ControlKind.light => Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: const Color(0xFF2B313A),
+                border: Border.all(color: Colors.white30, width: 2),
               ),
-              const SizedBox(height: 2),
-              Text(control.name,
-                  overflow: TextOverflow.ellipsis, style: _nameStyle),
-            ],
-          ),
+            ),
+            const SizedBox(height: 4),
+            Text(control.name,
+                overflow: TextOverflow.ellipsis, style: _nameStyle),
+          ],
         ),
-      ControlKind.display => SizedBox(
-          width: 76,
-          height: 46,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                width: 56,
-                height: 22,
-                decoration: BoxDecoration(
-                  color: Colors.black45,
-                  borderRadius: BorderRadius.circular(4),
-                  border: Border.all(color: Colors.white24),
-                ),
-                child: Center(
-                  child: Text('Abc',
-                      style: TextStyle(
-                        color: PinType.string.color,
-                        fontSize: 13,
-                        fontFamily: 'monospace',
-                        fontWeight: FontWeight.bold,
-                      )),
-                ),
+      ControlKind.display => Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 110,
+              height: (control.displayTextSize + 16).clamp(44.0, 60.0),
+              decoration: BoxDecoration(
+                color: Colors.black54,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.white24, width: 2),
               ),
-              const SizedBox(height: 2),
-              Text(control.name,
-                  overflow: TextOverflow.ellipsis, style: _nameStyle),
-            ],
-          ),
+              child: Center(
+                child: Text('Abc',
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: PinType.string.color,
+                      fontSize: control.displayTextSize,
+                      fontFamily: 'monospace',
+                      fontWeight: FontWeight.bold,
+                    )),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(control.name,
+                overflow: TextOverflow.ellipsis, style: _nameStyle),
+          ],
         ),
     };
   }

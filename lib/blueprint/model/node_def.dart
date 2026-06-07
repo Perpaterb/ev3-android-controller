@@ -242,6 +242,25 @@ const List<NodeDef> nodeCatalog = [
     ],
     outputs: [PinSpec('result', 'A + B', PinType.string)],
   ),
+  NodeDef(
+    id: 'text.fromBool',
+    title: 'Bool → String',
+    category: NodeCategory.text,
+    inputs: [PinSpec('value', 'Value', PinType.boolean)],
+    outputs: [PinSpec('result', 'Text', PinType.string)],
+  ),
+  // Stateful: power into "Make 1" / "Make 0" sets what it says — wire a
+  // button's pressed/released to show 1 while held.
+  NodeDef(
+    id: 'text.fromPower',
+    title: 'Power → String',
+    category: NodeCategory.text,
+    inputs: [
+      PinSpec('set1', 'Make 1', PinType.power),
+      PinSpec('set0', 'Make 0', PinType.power),
+    ],
+    outputs: [PinSpec('result', '0 / 1', PinType.string)],
+  ),
 ];
 
 final Map<String, NodeDef> _defIndex = {

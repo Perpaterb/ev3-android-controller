@@ -293,35 +293,50 @@ class _BlueprintEditorState extends State<BlueprintEditor> {
                     style: Theme.of(context).textTheme.titleMedium),
                 subtitle: Text(control.kind.label),
               ),
-              // Live size slider — the control resizes behind the sheet.
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Row(
-                  children: [
-                    const Icon(Icons.photo_size_select_large),
-                    const SizedBox(width: 8),
-                    const Text('Size'),
-                    Expanded(
-                      child: Slider(
-                        key: const Key('control-size'),
-                        min: 0.5,
-                        max: 2.0,
-                        divisions: 6,
-                        label: '${(control.scale * 100).round()}%',
-                        value: control.scale,
-                        onChanged: (value) {
-                          _layout.setControlScale(control.id, value);
-                          setSheetState(() {});
-                        },
-                      ),
-                    ),
-                    SizedBox(
-                      width: 44,
-                      child: Text('${(control.scale * 100).round()}%'),
-                    ),
-                  ],
-                ),
+              // Live size sliders — the control resizes behind the sheet.
+              _sheetSlider(
+                key: const Key('control-size-x'),
+                icon: Icons.swap_horiz,
+                label: 'Width',
+                value: control.scaleX,
+                min: 0.5,
+                max: 2.0,
+                divisions: 6,
+                display: '${(control.scaleX * 100).round()}%',
+                onChanged: (value) {
+                  _layout.setControlScale(control.id, x: value);
+                  setSheetState(() {});
+                },
               ),
+              _sheetSlider(
+                key: const Key('control-size-y'),
+                icon: Icons.swap_vert,
+                label: 'Height',
+                value: control.scaleY,
+                min: 0.5,
+                max: 2.0,
+                divisions: 6,
+                display: '${(control.scaleY * 100).round()}%',
+                onChanged: (value) {
+                  _layout.setControlScale(control.id, y: value);
+                  setSheetState(() {});
+                },
+              ),
+              if (control.kind == ControlKind.display)
+                _sheetSlider(
+                  key: const Key('control-text-size'),
+                  icon: Icons.text_fields,
+                  label: 'Text size',
+                  value: control.displayTextSize,
+                  min: 12,
+                  max: 40,
+                  divisions: 7,
+                  display: '${control.displayTextSize.round()}',
+                  onChanged: (value) {
+                    _layout.setDisplayTextSize(control.id, value);
+                    setSheetState(() {});
+                  },
+                ),
               SwitchListTile(
                 key: const Key('control-show-name'),
                 secondary: const Icon(Icons.label_outline),
@@ -437,6 +452,42 @@ class _BlueprintEditorState extends State<BlueprintEditor> {
             );
         if (confirmed) _layout.removeTab(tab.id);
     }
+  }
+
+  /// One labelled slider row inside the control sheet.
+  Widget _sheetSlider({
+    required Key key,
+    required IconData icon,
+    required String label,
+    required double value,
+    required double min,
+    required double max,
+    required int divisions,
+    required String display,
+    required ValueChanged<double> onChanged,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(
+        children: [
+          Icon(icon),
+          const SizedBox(width: 8),
+          SizedBox(width: 64, child: Text(label)),
+          Expanded(
+            child: Slider(
+              key: key,
+              min: min,
+              max: max,
+              divisions: divisions,
+              label: display,
+              value: value.clamp(min, max),
+              onChanged: onChanged,
+            ),
+          ),
+          SizedBox(width: 44, child: Text(display)),
+        ],
+      ),
+    );
   }
 
   // ---- dialogs -----------------------------------------------------------
