@@ -113,6 +113,36 @@ void main() {
     expect(lightColor(), Colors.amber);
   });
 
+  testWidgets('a display shows the slider value live', (tester) async {
+    final speed = addControl(ControlKind.slider, 'Speed',
+        position: const Offset(0.5, 0.3));
+    final readout = addControl(ControlKind.display, 'Readout',
+        position: const Offset(0.5, 0.7));
+    seed(wireUp: (graph) {
+      graph.connect(
+        PinRef(kControllerNodeId, '${speed.id}.value', isOutput: true),
+        PinRef(kControllerNodeId, '${readout.id}.value', isOutput: false),
+      );
+    });
+    await pumpRunMode(tester);
+
+    String shown() => (tester
+            .widget<Text>(find.byKey(Key('run-display-${readout.id}'))))
+        .data!;
+
+    expect(shown(), '0'); // slider starts at its minimum
+    await tester.drag(find.byType(Slider), const Offset(120, 0));
+    await tester.pump();
+    expect(int.parse(shown()), greaterThan(0));
+  });
+
+  testWidgets('an unwired display shows --', (tester) async {
+    addControl(ControlKind.display, 'Readout');
+    seed();
+    await pumpRunMode(tester);
+    expect(find.text('--'), findsOneWidget);
+  });
+
   testWidgets('tabs switch between control pages', (tester) async {
     addControl(ControlKind.button, 'Drive');
     final arm = layout.addTab('Arm');

@@ -35,6 +35,7 @@ IconData _iconFor(ControlKind kind) => switch (kind) {
       ControlKind.slider => Icons.tune,
       ControlKind.toggle => Icons.toggle_on,
       ControlKind.light => Icons.lightbulb_outline,
+      ControlKind.display => Icons.pin_outlined,
     };
 
 String _describe(ControlKind kind) => switch (kind) {
@@ -43,4 +44,5 @@ String _describe(ControlKind kind) => switch (kind) {
       ControlKind.slider => 'Picks a number (0–100)',
       ControlKind.toggle => 'Switches between yes and no',
       ControlKind.light => 'Shows a yes/no from your robot',
+      ControlKind.display => 'Shows a number from your robot',
     };

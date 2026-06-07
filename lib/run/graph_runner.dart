@@ -22,8 +22,10 @@ class GraphRunner extends ChangeNotifier {
   GraphRunner({
     required this.graph,
     required this.layout,
-    required this.brick,
-  }) {
+    required Ev3Brick brick,
+    // ignore: prefer_initializing_formals — the field is private.
+  }) : _brick = brick {
+    _attachBrick();
     for (final tab in layout.tabs) {
       for (final control in tab.controls) {
         switch (control.kind) {
@@ -42,9 +44,36 @@ class GraphRunner extends ChangeNotifier {
   final BlueprintGraph graph;
   final ControllerLayout layout;
 
+  Ev3Brick _brick;
+  Ev3Brick get brick => _brick;
+
   /// Swappable mid-run: connecting/disconnecting the real brick replaces
   /// this without rebuilding the runner (control state survives).
-  Ev3Brick brick;
+  set brick(Ev3Brick value) {
+    if (identical(value, _brick)) return;
+    _detachBrick();
+    _brick = value;
+    _attachBrick();
+    notifyListeners();
+  }
+
+  // Sensor caches changing on the brick must re-render lights and displays,
+  // so brick notifications are re-broadcast as runner notifications.
+  void _attachBrick() {
+    final b = _brick;
+    if (b is Listenable) (b as Listenable).addListener(notifyListeners);
+  }
+
+  void _detachBrick() {
+    final b = _brick;
+    if (b is Listenable) (b as Listenable).removeListener(notifyListeners);
+  }
+
+  @override
+  void dispose() {
+    _detachBrick();
+    super.dispose();
+  }
 
   /// Live state of stateful controls: sliderId → int, toggleId → bool.
   final Map<String, Object> _controlValues = {};
@@ -66,6 +95,16 @@ class GraphRunner extends ChangeNotifier {
         _wireInto(PinRef(kControllerNodeId, '$controlId.on', isOutput: false));
     if (wire == null) return false;
     return _toBool(_evalOutput(wire.from, {}), false);
+  }
+
+  /// The number a display control should show: evaluates whatever is wired
+  /// into its `value` input right now, or null when nothing is wired.
+  int? displayValue(String controlId) {
+    final wire = _wireInto(
+        PinRef(kControllerNodeId, '$controlId.value', isOutput: false));
+    if (wire == null) return null;
+    final value = _evalOutput(wire.from, {});
+    return value is int ? value : null;
   }
 
   // ---- controller events ---------------------------------------------------

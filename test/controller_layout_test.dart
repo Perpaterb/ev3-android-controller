@@ -77,6 +77,19 @@ void main() {
     expect(def.inputs.single.type, PinType.boolean);
   });
 
+  test('a display is an int input on the controller node', () {
+    layout.addControl(
+      tabId: layout.tabs.single.id,
+      kind: ControlKind.display,
+      name: 'Speed',
+      position: const Offset(0.5, 0.5),
+    );
+    final def = layout.buildNodeDef();
+    expect(def.outputs, isEmpty);
+    expect(def.inputs.single.label, 'Speed value');
+    expect(def.inputs.single.type, PinType.integer);
+  });
+
   test('renaming a control changes labels but not pin ids', () {
     final control = layout.addControl(
       tabId: layout.tabs.single.id,

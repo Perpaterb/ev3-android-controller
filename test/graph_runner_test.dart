@@ -201,6 +201,50 @@ void main() {
     expect(r.lightOn(bump.id), isTrue);
   });
 
+  test('a display shows the slider wired into it', () {
+    final speed = addControl(ControlKind.slider, 'Speed');
+    final readout = addControl(ControlKind.display, 'Readout');
+    syncController();
+    wire(kControllerNodeId, '${speed.id}.value', kControllerNodeId,
+        '${readout.id}.value');
+
+    final r = runner();
+    expect(r.displayValue(readout.id), 0); // slider starts at its minimum
+    r.sliderChanged(speed.id, 73);
+    expect(r.displayValue(readout.id), 73);
+  });
+
+  test('a display shows math over a sensor', () {
+    final readout = addControl(ControlKind.display, 'Distance');
+    syncController();
+    final sensor = node('sensor.distance', {'port': '3'});
+    final add = node('math.add');
+    final offset = node('value.int', {'value': 5});
+    wire(sensor.id, 'distance', add.id, 'a');
+    wire(offset.id, 'value', add.id, 'b');
+    wire(add.id, 'result', kControllerNodeId, '${readout.id}.value');
+
+    brick.distanceValues[3] = 40;
+    expect(runner().displayValue(readout.id), 45);
+  });
+
+  test('an unwired display has no value', () {
+    final readout = addControl(ControlKind.display, 'Readout');
+    syncController();
+    expect(runner().displayValue(readout.id), isNull);
+  });
+
+  test('brick sensor updates re-broadcast through the runner', () {
+    addControl(ControlKind.light, 'Bump');
+    syncController();
+    final r = runner();
+    var notified = 0;
+    r.addListener(() => notified++);
+    brick.touchValues[1] = true;
+    brick.notifyListeners(); // what a sensor cache update does
+    expect(notified, 1);
+  });
+
   test('an unwired light is off', () {
     final lamp = addControl(ControlKind.light, 'Lamp');
     syncController();

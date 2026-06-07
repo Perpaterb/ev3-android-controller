@@ -11,7 +11,8 @@ enum ControlKind {
   dpad('D-pad'),
   slider('Slider'),
   toggle('Toggle'),
-  light('Light');
+  light('Light'),
+  display('Display');
 
   const ControlKind(this.label);
 
@@ -62,12 +63,16 @@ class ControllerControl {
             PinSpec('$id.switched', '$name switched', PinType.power),
           ],
         ControlKind.light => const [],
+        ControlKind.display => const [],
       };
 
   /// What this control *displays* — pins on the left of the controller node.
   List<PinSpec> get inputPins => switch (kind) {
         ControlKind.light => [
             PinSpec('$id.on', '$name on?', PinType.boolean),
+          ],
+        ControlKind.display => [
+            PinSpec('$id.value', '$name value', PinType.integer),
           ],
         _ => const [],
       };

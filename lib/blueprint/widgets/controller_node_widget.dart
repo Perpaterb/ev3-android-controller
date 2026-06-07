@@ -314,6 +314,7 @@ class _ControllerNodeWidgetState extends State<ControllerNodeWidget> {
         ControlKind.toggle => const Size(64, 38),
         ControlKind.dpad => const Size(64, 58),
         ControlKind.light => const Size(48, 42),
+        ControlKind.display => const Size(76, 46),
       };
 }
 
@@ -429,6 +430,36 @@ class _ControlVisual extends StatelessWidget {
                   shape: BoxShape.circle,
                   color: Colors.white12,
                   border: Border.all(color: Colors.white38),
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(control.name,
+                  overflow: TextOverflow.ellipsis, style: _nameStyle),
+            ],
+          ),
+        ),
+      ControlKind.display => SizedBox(
+          width: 76,
+          height: 46,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 56,
+                height: 22,
+                decoration: BoxDecoration(
+                  color: Colors.black45,
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: Colors.white24),
+                ),
+                child: Center(
+                  child: Text('0',
+                      style: TextStyle(
+                        color: PinType.integer.color,
+                        fontSize: 13,
+                        fontFamily: 'monospace',
+                        fontWeight: FontWeight.bold,
+                      )),
                 ),
               ),
               const SizedBox(height: 2),

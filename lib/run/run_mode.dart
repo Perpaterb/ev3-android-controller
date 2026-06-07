@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../blueprint/model/controller_layout.dart';
 import '../blueprint/model/graph.dart';
 import '../blueprint/model/node_def.dart';
+import '../blueprint/model/pins.dart';
 import '../models/project.dart';
 import '../services/brick_connection.dart';
 import '../services/ev3_brick.dart';
@@ -61,6 +62,7 @@ class _RunModeState extends State<RunMode> with WidgetsBindingObserver {
   @override
   void dispose() {
     _activeBrick.stopAll(); // never leave motors running behind us
+    _runner.dispose();
     widget.connection?.removeListener(_onConnectionChanged);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
@@ -253,6 +255,7 @@ class _RunModeState extends State<RunMode> with WidgetsBindingObserver {
       ControlKind.slider => _RunSlider(control: control, runner: _runner),
       ControlKind.toggle => _RunToggle(control: control, runner: _runner),
       ControlKind.light => _RunLight(control: control, runner: _runner),
+      ControlKind.display => _RunDisplay(control: control, runner: _runner),
     };
     return Positioned(
       left: control.position.dx * area.width - size.width / 2,
@@ -268,6 +271,7 @@ class _RunModeState extends State<RunMode> with WidgetsBindingObserver {
         ControlKind.toggle => const Size(110, 72),
         ControlKind.dpad => const Size(168, 168),
         ControlKind.light => const Size(80, 76),
+        ControlKind.display => const Size(130, 80),
       };
 }
 
@@ -451,6 +455,48 @@ class _RunToggle extends StatelessWidget {
           value: runner.toggleValue(control.id),
           onChanged: (v) => runner.toggleChanged(control.id, v),
         ),
+      ],
+    );
+  }
+}
+
+class _RunDisplay extends StatelessWidget {
+  const _RunDisplay({required this.control, required this.runner});
+
+  final ControllerControl control;
+  final GraphRunner runner;
+
+  @override
+  Widget build(BuildContext context) {
+    final value = runner.displayValue(control.id);
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Container(
+          width: 110,
+          height: 44,
+          decoration: BoxDecoration(
+            color: Colors.black54,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: Colors.white24, width: 2),
+          ),
+          child: Center(
+            child: Text(
+              value?.toString() ?? '--',
+              key: Key('run-display-${control.id}'),
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: PinType.integer.color,
+                fontSize: 24,
+                fontFamily: 'monospace',
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(control.name,
+            overflow: TextOverflow.ellipsis, style: _controlNameStyle),
       ],
     );
   }
