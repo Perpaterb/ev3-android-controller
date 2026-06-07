@@ -1,5 +1,6 @@
 import 'package:ev3_controller/blueprint/blueprint_editor.dart';
 import 'package:ev3_controller/main.dart';
+import 'package:ev3_controller/run/run_mode.dart';
 import 'package:ev3_controller/services/project_store.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -45,7 +46,7 @@ void main() {
 
     await tester.tap(find.text('Run'));
     await tester.pumpAndSettle();
-    expect(find.text('Run mode'), findsOneWidget);
+    expect(find.byType(RunMode), findsOneWidget);
 
     await tester.tap(find.text('Build'));
     await tester.pumpAndSettle();

@@ -184,9 +184,13 @@ class BlueprintGraph extends ChangeNotifier {
 
   /// True when a wire between these two pins would be valid, in either
   /// tap order.
+  ///
+  /// Self-wiring is rejected except on the controller node: wiring a toggle
+  /// straight to a light (both controller pins) is natural and safe — the
+  /// runner guards against evaluation cycles.
   bool canConnect(PinRef a, PinRef b) {
     if (a.isOutput == b.isOutput) return false;
-    if (a.nodeId == b.nodeId) return false;
+    if (a.nodeId == b.nodeId && a.nodeId != kControllerNodeId) return false;
     final typeA = pinType(a);
     return typeA != null && typeA == pinType(b);
   }

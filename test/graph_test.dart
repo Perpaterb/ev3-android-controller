@@ -197,6 +197,32 @@ void main() {
       expect(graph.node(kControllerNodeId), isNotNull);
     });
 
+    test('a controller output can wire to a controller input (toggle→light)',
+        () {
+      final layout = ControllerLayout();
+      final toggle = layout.addControl(
+        tabId: layout.tabs.single.id,
+        kind: ControlKind.toggle,
+        name: 'Power',
+        position: const Offset(0.3, 0.5),
+      );
+      final light = layout.addControl(
+        tabId: layout.tabs.single.id,
+        kind: ControlKind.light,
+        name: 'Lamp',
+        position: const Offset(0.7, 0.5),
+      );
+      graph.ensureControllerNode(layout.buildNodeDef(), Offset.zero);
+
+      expect(
+        graph.connect(
+          PinRef(kControllerNodeId, '${toggle.id}.state', isOutput: true),
+          PinRef(kControllerNodeId, '${light.id}.on', isOutput: false),
+        ),
+        isTrue,
+      );
+    });
+
     test('controller pins are wireable like any other pin', () {
       final layout = layoutWithButton('Go');
       final node =

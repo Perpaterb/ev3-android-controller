@@ -69,10 +69,20 @@ class _BlueprintEditorState extends State<BlueprintEditor> {
   }
 
   @override
-  void dispose() {
+  void deactivate() {
+    // Flush pending saves here rather than in dispose: when the user flips
+    // Build → Run, the new RunMode subtree initialises *before* this editor
+    // is disposed, and it must read the freshest graph from the project.
     _saveTimer?.cancel();
     if (_dirty) _persist();
     _persistViewport();
+    super.deactivate();
+  }
+
+  @override
+  void dispose() {
+    _saveTimer?.cancel();
+    if (_dirty) _persist();
     _graph.removeListener(_onGraphChanged);
     _layout.removeListener(_onLayoutChanged);
     super.dispose();

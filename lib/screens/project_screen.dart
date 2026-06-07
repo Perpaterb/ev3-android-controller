@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../blueprint/blueprint_editor.dart';
 import '../models/project.dart';
+import '../run/run_mode.dart';
 import '../services/project_store.dart';
 
 enum ProjectMode { build, run }
@@ -54,37 +55,8 @@ class _ProjectScreenState extends State<ProjectScreen> {
       body: switch (_mode) {
         ProjectMode.build =>
           BlueprintEditor(store: widget.store, project: widget.project),
-        ProjectMode.run => const _Placeholder(
-            icon: Icons.sports_esports_outlined,
-            label: 'Run mode',
-            detail: 'Your controller will appear here.',
-          ),
+        ProjectMode.run => RunMode(project: widget.project),
       },
-    );
-  }
-}
-
-class _Placeholder extends StatelessWidget {
-  const _Placeholder(
-      {required this.icon, required this.label, required this.detail});
-
-  final IconData icon;
-  final String label;
-  final String detail;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 96),
-          const SizedBox(height: 16),
-          Text(label, style: Theme.of(context).textTheme.headlineSmall),
-          const SizedBox(height: 8),
-          Text(detail),
-        ],
-      ),
     );
   }
 }
