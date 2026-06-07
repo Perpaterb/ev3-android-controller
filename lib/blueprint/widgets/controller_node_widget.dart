@@ -323,16 +323,64 @@ class _ControllerNodeWidgetState extends State<ControllerNodeWidget> {
         child: SizedBox(
           width: size.width,
           height: size.height,
-          child: FittedBox(
-            fit: BoxFit.fill,
-            child: SizedBox(
-              width: base.width,
-              height: base.height,
-              child: _ControlVisual(control: control),
+          // Displays render at real size so their text never stretches;
+          // everything else scales through a FittedBox.
+          child: control.kind == ControlKind.display
+              ? _DisplayPreview(control: control, factor: factor)
+              : FittedBox(
+                  fit: BoxFit.fill,
+                  child: SizedBox(
+                    width: base.width,
+                    height: base.height,
+                    child: _ControlVisual(control: control),
+                  ),
+                ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Designer twin of the Run-mode display: the box fills the control's size,
+/// the sample text stays at its configured (unstretched) size.
+class _DisplayPreview extends StatelessWidget {
+  const _DisplayPreview({required this.control, required this.factor});
+
+  final ControllerControl control;
+  final double factor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Expanded(
+          child: Container(
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: Colors.black54,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.white24, width: 2),
+            ),
+            child: Center(
+              child: Text(
+                'Abc',
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: PinType.string.color,
+                  fontSize: control.displayTextSize * factor,
+                  fontFamily: 'monospace',
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ),
           ),
         ),
-      ),
+        SizedBox(height: 4 * factor),
+        Text(control.name,
+            overflow: TextOverflow.ellipsis,
+            style:
+                TextStyle(color: Colors.white70, fontSize: 12 * factor)),
+      ],
     );
   }
 }

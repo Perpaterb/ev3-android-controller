@@ -151,27 +151,80 @@ class _BlueprintEditorState extends State<BlueprintEditor> {
     if (_graph.canConnect(from, ref)) {
       _graph.connect(from, ref);
       setState(() => _wiringFrom = null);
+    } else if (_autoConverterId(from, ref) != null) {
+      _insertConverter(from, ref);
+      setState(() => _wiringFrom = null);
     }
     // Incompatible pin: ignore the tap, stay in wiring mode.
   }
 
   void _cancelWiring() => setState(() => _wiringFrom = null);
 
+  /// Connectable directly, or via an auto-inserted converter.
+  bool _canLink(PinRef from, PinRef target) =>
+      _graph.canConnect(from, target) ||
+      _autoConverterId(from, target) != null;
+
+  /// "Plug anything into a string": when the target pin is a string input
+  /// and the source is int/bool/power, the matching X → String node can be
+  /// dropped in automatically. Returns its defId, or null.
+  String? _autoConverterId(PinRef a, PinRef b) {
+    if (a.isOutput == b.isOutput) return null;
+    final output = a.isOutput ? a : b;
+    final input = a.isOutput ? b : a;
+    if (_graph.pinType(input) != PinType.string) return null;
+    return switch (_graph.pinType(output)) {
+      PinType.integer => 'text.fromInt',
+      PinType.boolean => 'text.fromBool',
+      PinType.power => 'text.fromPower',
+      _ => null,
+    };
+  }
+
+  /// Creates the converter halfway along where the wire would run and wires
+  /// both halves up.
+  void _insertConverter(PinRef a, PinRef b) {
+    final output = a.isOutput ? a : b;
+    final input = a.isOutput ? b : a;
+    final defId = _autoConverterId(a, b)!;
+    final converterInput = switch (defId) {
+      'text.fromInt' => 'number',
+      'text.fromBool' => 'value',
+      _ => 'set1', // text.fromPower: power means "make it 1"
+    };
+    final fromNode = _graph.node(output.nodeId);
+    final toNode = _graph.node(input.nodeId);
+    if (fromNode == null || toNode == null) return;
+    final def = nodeDefById(defId)!;
+
+    final start = fromNode.position +
+        nodePinOffset(fromNode, output.pinId, isOutput: true);
+    final end =
+        toNode.position + nodePinOffset(toNode, input.pinId, isOutput: false);
+    final mid = Offset((start.dx + end.dx) / 2, (start.dy + end.dy) / 2);
+    final size = nodeSize(def);
+    final converter = _graph.addNode(
+        def, mid - Offset(size.width / 2, size.height / 2));
+
+    _graph.connect(output, PinRef(converter.id, converterInput, isOutput: false));
+    _graph.connect(PinRef(converter.id, 'result', isOutput: true), input);
+  }
+
   bool _pinHighlighted(PinRef ref) {
     final from = _wiringFrom;
-    return from != null && (ref == from || _graph.canConnect(from, ref));
+    return from != null && (ref == from || _canLink(from, ref));
   }
 
   bool _nodeDimmed(GraphNode node) {
     final from = _wiringFrom;
     if (from == null || node.id == from.nodeId) return false;
     for (final input in node.def.inputs) {
-      if (_graph.canConnect(from, PinRef(node.id, input.id, isOutput: false))) {
+      if (_canLink(from, PinRef(node.id, input.id, isOutput: false))) {
         return false;
       }
     }
     for (final output in node.def.outputs) {
-      if (_graph.canConnect(from, PinRef(node.id, output.id, isOutput: true))) {
+      if (_canLink(from, PinRef(node.id, output.id, isOutput: true))) {
         return false;
       }
     }
@@ -300,8 +353,9 @@ class _BlueprintEditorState extends State<BlueprintEditor> {
                 label: 'Width',
                 value: control.scaleX,
                 min: 0.5,
-                max: 2.0,
-                divisions: 6,
+                // Displays may grow to ~80% of the stage width.
+                max: control.kind == ControlKind.display ? 5.0 : 2.0,
+                divisions: control.kind == ControlKind.display ? 18 : 6,
                 display: '${(control.scaleX * 100).round()}%',
                 onChanged: (value) {
                   _layout.setControlScale(control.id, x: value);

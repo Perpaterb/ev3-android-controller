@@ -142,6 +142,53 @@ void main() {
         isEmpty);
   });
 
+  testWidgets(
+      'wiring an int output into a string display auto-inserts Int → String',
+      (tester) async {
+    // A display control (string input) on the controller…
+    final layout = ControllerLayout();
+    final readout = layout.addControl(
+      tabId: layout.tabs.single.id,
+      kind: ControlKind.display,
+      name: 'Readout',
+      position: const Offset(0.5, 0.5),
+    );
+    project.controller.addAll(layout.toJson());
+    // …and an Integer node off to the left.
+    final graph = BlueprintGraph();
+    final number =
+        graph.addNode(nodeDefById('value.int')!, const Offset(-760, -40));
+    project.graph.addAll(graph.toJson());
+    await pumpEditor(tester);
+
+    await tester.tap(find.byKey(Key('pin-${number.id}-value-out')));
+    await tester.pump();
+    // The string pin glows as connectable despite the type mismatch.
+    await tester
+        .tap(find.byKey(Key('pin-controller-${readout.id}.value-in')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('cancel-wiring')), findsNothing);
+    final json = await saved(tester);
+    final wires = json['wires'] as List;
+    expect(wires, hasLength(2));
+    final nodes = (json['nodes'] as List).cast<Map>();
+    final converter =
+        nodes.singleWhere((n) => n['def'] == 'text.fromInt');
+    // int → converter → display, joined through the new node.
+    expect(
+      wires.any((w) =>
+          w['fromNode'] == number.id && w['toNode'] == converter['id']),
+      isTrue,
+    );
+    expect(
+      wires.any((w) =>
+          w['fromNode'] == converter['id'] &&
+          w['toPin'] == '${readout.id}.value'),
+      isTrue,
+    );
+  });
+
   testWidgets('renaming a control relabels its pins but keeps wires',
       (tester) async {
     final control = seedButton('Go');

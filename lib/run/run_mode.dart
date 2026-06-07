@@ -274,27 +274,43 @@ class _RunModeState extends State<RunMode> with WidgetsBindingObserver {
       base.width * control.scaleX * factor,
       base.height * control.scaleY * factor,
     );
-    final child = switch (control.kind) {
-      ControlKind.button => _RunButton(control: control, runner: _runner),
-      ControlKind.dpad => _RunDpad(control: control, runner: _runner),
-      ControlKind.slider => _RunSlider(control: control, runner: _runner),
-      ControlKind.toggle => _RunToggle(control: control, runner: _runner),
-      ControlKind.light => _RunLight(control: control, runner: _runner),
-      ControlKind.display => _RunDisplay(control: control, runner: _runner),
-    };
+    // Displays are laid out at their real size instead of being scaled
+    // through a FittedBox: the box stretches, the text never does.
+    final sized = control.kind == ControlKind.display
+        ? SizedBox(
+            width: size.width,
+            height: size.height,
+            child: _RunDisplay(
+                control: control, runner: _runner, factor: factor),
+          )
+        : SizedBox(
+            width: size.width,
+            height: size.height,
+            child: FittedBox(
+              fit: BoxFit.fill,
+              child: SizedBox(
+                width: base.width,
+                height: base.height,
+                child: switch (control.kind) {
+                  ControlKind.button =>
+                    _RunButton(control: control, runner: _runner),
+                  ControlKind.dpad =>
+                    _RunDpad(control: control, runner: _runner),
+                  ControlKind.slider =>
+                    _RunSlider(control: control, runner: _runner),
+                  ControlKind.toggle =>
+                    _RunToggle(control: control, runner: _runner),
+                  ControlKind.light =>
+                    _RunLight(control: control, runner: _runner),
+                  ControlKind.display => const SizedBox.shrink(), // above
+                },
+              ),
+            ),
+          );
     // Output-only controls must never swallow a touch meant for whatever is
     // underneath them.
     final passive = control.kind == ControlKind.light ||
         control.kind == ControlKind.display;
-    final sized = SizedBox(
-      width: size.width,
-      height: size.height,
-      child: FittedBox(
-        fit: BoxFit.fill,
-        child:
-            SizedBox(width: base.width, height: base.height, child: child),
-      ),
-    );
     return Positioned(
       left: control.position.dx * stage.width - size.width / 2,
       top: control.position.dy * stage.height - size.height / 2,
@@ -498,44 +514,51 @@ class _RunToggle extends StatelessWidget {
   }
 }
 
+/// Fills the box it's given; only the box scales with the size sliders —
+/// the text renders at its configured size (times the stage factor) and is
+/// never stretched or distorted.
 class _RunDisplay extends StatelessWidget {
-  const _RunDisplay({required this.control, required this.runner});
+  const _RunDisplay(
+      {required this.control, required this.runner, required this.factor});
 
   final ControllerControl control;
   final GraphRunner runner;
+  final double factor;
 
   @override
   Widget build(BuildContext context) {
     final value = runner.displayValue(control.id);
     return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Container(
-          width: 110,
-          height: (control.displayTextSize + 16).clamp(44.0, 60.0),
-          decoration: BoxDecoration(
-            color: Colors.black54,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: Colors.white24, width: 2),
-          ),
-          child: Center(
-            child: Text(
-              value ?? '--',
-              key: Key('run-display-${control.id}'),
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: PinType.string.color,
-                fontSize: control.displayTextSize,
-                fontFamily: 'monospace',
-                fontWeight: FontWeight.bold,
+        Expanded(
+          child: Container(
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: Colors.black54,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.white24, width: 2),
+            ),
+            child: Center(
+              child: Text(
+                value ?? '--',
+                key: Key('run-display-${control.id}'),
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: PinType.string.color,
+                  fontSize: control.displayTextSize * factor,
+                  fontFamily: 'monospace',
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ),
         ),
         if (control.showName) ...[
-          const SizedBox(height: 4),
+          SizedBox(height: 4 * factor),
           Text(control.name,
-              overflow: TextOverflow.ellipsis, style: _controlNameStyle),
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                  color: Colors.white70, fontSize: 12 * factor)),
         ],
       ],
     );

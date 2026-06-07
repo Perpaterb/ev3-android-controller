@@ -320,10 +320,12 @@ class ControllerLayout extends ChangeNotifier {
   }
 
   /// Sets a control's size multipliers, clamped to 50%–200% per axis.
+  /// Displays may go much wider — up to 5x (~80% of the stage width).
   void setControlScale(String id, {double? x, double? y}) {
     final target = control(id);
     if (target == null) return;
-    if (x != null) target.config['scaleX'] = x.clamp(0.5, 2.0);
+    final maxX = target.kind == ControlKind.display ? 5.0 : 2.0;
+    if (x != null) target.config['scaleX'] = x.clamp(0.5, maxX);
     if (y != null) target.config['scaleY'] = y.clamp(0.5, 2.0);
     notifyListeners();
   }
