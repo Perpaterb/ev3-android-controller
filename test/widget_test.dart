@@ -1,24 +1,10 @@
 import 'package:ev3_controller/blueprint/blueprint_editor.dart';
 import 'package:ev3_controller/main.dart';
-import 'package:ev3_controller/models/project.dart';
 import 'package:ev3_controller/services/project_store.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// Microtask-only storage: real file IO never completes inside the
-/// fake-async zone widget tests run in.
-class InMemoryProjectStorage implements ProjectStorage {
-  final Map<String, Project> _byId = {};
-
-  @override
-  Future<List<Project>> loadAll() async => _byId.values.toList();
-
-  @override
-  Future<void> write(Project project) async => _byId[project.id] = project;
-
-  @override
-  Future<void> delete(String id) async => _byId.remove(id);
-}
+import 'in_memory_project_storage.dart';
 
 void main() {
   late ProjectStore store;

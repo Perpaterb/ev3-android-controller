@@ -58,7 +58,10 @@ void main() {
 
   testWidgets('one-finger drag pans the canvas', (tester) async {
     await pumpCanvas(tester);
-    await tester.drag(find.byType(BlueprintCanvas), const Offset(-50, 25));
+    // touchSlop 0: don't let the test harness split off a slop prefix —
+    // we're asserting the pan distance, not slop behaviour.
+    await tester.drag(find.byType(BlueprintCanvas), const Offset(-50, 25),
+        touchSlopX: 0, touchSlopY: 0);
     await tester.pump();
     expect(viewport.translation.dx, closeTo(-50, 1e-6));
     expect(viewport.translation.dy, closeTo(25, 1e-6));

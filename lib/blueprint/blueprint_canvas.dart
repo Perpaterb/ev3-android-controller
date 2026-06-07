@@ -14,14 +14,27 @@ import 'grid_painter.dart';
 /// so wiring mode can never strand the user somewhere they can't navigate
 /// out of.
 ///
-/// [children] are laid out in canvas coordinates under the viewport
-/// transform — that's where nodes go.
+/// [children] are stacked above the grid in *screen* space — the editor
+/// positions nodes itself via [CanvasViewport.toScreen]. (Screen space keeps
+/// hit-testing simple: a transformed child outside the Stack's bounds would
+/// silently stop receiving taps.)
 class BlueprintCanvas extends StatefulWidget {
-  const BlueprintCanvas(
-      {super.key, required this.viewport, this.children = const []});
+  const BlueprintCanvas({
+    super.key,
+    required this.viewport,
+    this.children = const [],
+    this.onTapCanvas,
+    this.onLongPressCanvas,
+  });
 
   final CanvasViewport viewport;
   final List<Widget> children;
+
+  /// Tap on empty canvas (canvas coordinates) — clear selection etc.
+  final void Function(Offset canvasPosition)? onTapCanvas;
+
+  /// Long-press on empty canvas (canvas coordinates) — open the add menu.
+  final void Function(Offset canvasPosition)? onLongPressCanvas;
 
   @override
   State<BlueprintCanvas> createState() => _BlueprintCanvasState();
@@ -77,24 +90,22 @@ class _BlueprintCanvasState extends State<BlueprintCanvas> {
       onPointerSignal: _onPointerSignal,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
+        // Count drags from the finger-down point: without this the slop
+        // distance the recognizer needs before accepting gets swallowed and
+        // the first ~36px of every pan is lost.
+        dragStartBehavior: DragStartBehavior.down,
         onScaleStart: _onScaleStart,
         onScaleUpdate: _onScaleUpdate,
+        onTapUp: (details) =>
+            widget.onTapCanvas?.call(viewport.toCanvas(details.localPosition)),
+        onLongPressStart: (details) => widget.onLongPressCanvas
+            ?.call(viewport.toCanvas(details.localPosition)),
         child: ClipRect(
           child: CustomPaint(
             painter: GridPainter(viewport: viewport),
-            child: ListenableBuilder(
-              listenable: viewport,
-              builder: (context, _) => Transform.translate(
-                offset: viewport.translation,
-                child: Transform.scale(
-                  scale: viewport.scale,
-                  alignment: Alignment.topLeft,
-                  child: Stack(
-                    clipBehavior: Clip.none,
-                    children: widget.children,
-                  ),
-                ),
-              ),
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: widget.children,
             ),
           ),
         ),
