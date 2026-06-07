@@ -1,6 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application
-        android:label="ev3_controller"
+        android:label="EV3 Controller"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
