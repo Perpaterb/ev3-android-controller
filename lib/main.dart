@@ -23,7 +23,7 @@ class Ev3ControllerApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'EV3 Controller',
+      title: 'BrickLogic',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFFD01012)),
         cardTheme: const CardThemeData(
