@@ -249,16 +249,14 @@ const List<NodeDef> nodeCatalog = [
     inputs: [PinSpec('value', 'Value', PinType.boolean)],
     outputs: [PinSpec('result', 'Text', PinType.string)],
   ),
-  // Stateful: power into "Make 1" / "Make 0" sets what it says — wire a
-  // button's pressed/released to show 1 while held.
+  // "1" while power is flowing, "0" when it isn't: wired to a button or
+  // d-pad it reads the held state live; other power sources blink a short 1
+  // per pulse.
   NodeDef(
     id: 'text.fromPower',
     title: 'Power → String',
     category: NodeCategory.text,
-    inputs: [
-      PinSpec('set1', 'Make 1', PinType.power),
-      PinSpec('set0', 'Make 0', PinType.power),
-    ],
+    inputs: [PinSpec('power', 'Power', PinType.power)],
     outputs: [PinSpec('result', '0 / 1', PinType.string)],
   ),
 ];

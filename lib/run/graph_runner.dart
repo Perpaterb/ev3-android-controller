@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import '../blueprint/model/controller_layout.dart';
@@ -71,6 +73,9 @@ class GraphRunner extends ChangeNotifier {
 
   @override
   void dispose() {
+    for (final timer in _pulseTimers.values) {
+      timer.cancel();
+    }
     _detachBrick();
     super.dispose();
   }
@@ -80,6 +85,13 @@ class GraphRunner extends ChangeNotifier {
 
   /// Per-node runtime state for stateful nodes (Power → String).
   final Map<String, Object> _nodeState = {};
+
+  /// Which momentary controls are currently held: button ids, plus
+  /// `<dpadId>.<direction>` entries.
+  final Set<String> _held = {};
+
+  /// Decay timers for Power → String pulses from non-held sources.
+  final Map<String, Timer> _pulseTimers = {};
 
   /// Power chains longer than this are cut — a kid can't build an infinite
   /// loop that hangs the app.
@@ -112,15 +124,26 @@ class GraphRunner extends ChangeNotifier {
 
   // ---- controller events ---------------------------------------------------
 
-  void buttonPressed(String controlId) => _fireControl('$controlId.pressed');
+  void buttonPressed(String controlId) {
+    _held.add(controlId);
+    _fireControl('$controlId.pressed');
+  }
 
-  void buttonReleased(String controlId) => _fireControl('$controlId.released');
+  void buttonReleased(String controlId) {
+    _held.remove(controlId);
+    _fireControl('$controlId.released');
+  }
 
   /// [direction] is one of up/down/left/right.
-  void dpadPressed(String controlId, String direction) =>
-      _fireControl('$controlId.$direction');
+  void dpadPressed(String controlId, String direction) {
+    _held.add('$controlId.$direction');
+    _fireControl('$controlId.$direction');
+  }
 
-  void dpadReleased(String controlId) => _fireControl('$controlId.released');
+  void dpadReleased(String controlId) {
+    _held.removeWhere((h) => h.startsWith('$controlId.'));
+    _fireControl('$controlId.released');
+  }
 
   void sliderChanged(String controlId, int value) {
     _controlValues[controlId] = value;
@@ -171,7 +194,14 @@ class GraphRunner extends ChangeNotifier {
         fire('then1');
         fire('then2');
       case 'text.fromPower':
-        _nodeState[node.id] = inputPin == 'set1' ? '1' : '0';
+        // A pulse from a non-held source shows as a short blink of "1".
+        _nodeState[node.id] = '1';
+        _pulseTimers[node.id]?.cancel();
+        _pulseTimers[node.id] =
+            Timer(const Duration(milliseconds: 250), () {
+          _nodeState[node.id] = '0';
+          notifyListeners();
+        });
       default:
         // Pure nodes have no power inputs; nothing to do.
         break;
@@ -213,7 +243,7 @@ class GraphRunner extends ChangeNotifier {
         'text.fromInt' => '${input('number', 0)}',
         'text.append' => str('a') + str('b'),
         'text.fromBool' => flag('value', false) ? 'true' : 'false',
-        'text.fromPower' => _nodeState[node.id] as String? ?? '0',
+        'text.fromPower' => _powerLevelString(node),
         'math.add' => input('a', 0) + input('b', 0),
         'math.subtract' => input('a', 0) - input('b', 0),
         'math.multiply' => input('a', 0) * input('b', 0),
@@ -231,6 +261,34 @@ class GraphRunner extends ChangeNotifier {
     } finally {
       visiting.remove(key);
     }
+  }
+
+  /// "1" if power is flowing into the node, "0" if not. Wired to a held
+  /// control (button, d-pad direction) this reads the live held state;
+  /// `released` pins read the inverse; pulse-only sources fall back to the
+  /// blink state set in [_execute].
+  String _powerLevelString(GraphNode node) {
+    final wire = _wireInto(PinRef(node.id, 'power', isOutput: false));
+    if (wire == null) return '0';
+    if (wire.fromNode == kControllerNodeId) {
+      final pinId = wire.fromPin;
+      final dot = pinId.indexOf('.');
+      if (dot > 0) {
+        final controlId = pinId.substring(0, dot);
+        final capability = pinId.substring(dot + 1);
+        switch (capability) {
+          case 'pressed':
+            return _held.contains(controlId) ? '1' : '0';
+          case 'up' || 'down' || 'left' || 'right':
+            return _held.contains('$controlId.$capability') ? '1' : '0';
+          case 'released':
+            final held = _held.contains(controlId) ||
+                _held.any((h) => h.startsWith('$controlId.'));
+            return held ? '0' : '1';
+        }
+      }
+    }
+    return _nodeState[node.id] as String? ?? '0';
   }
 
   Object? _evalControllerPin(String pinId) {

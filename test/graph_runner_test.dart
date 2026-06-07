@@ -263,14 +263,13 @@ void main() {
     expect(r.displayValue(readout.id), 'true');
   });
 
-  test('power → string shows 1 while a button is held', () {
+  test('power → string is 1 while a button is held, 0 when not', () {
     final go = addControl(ControlKind.button, 'Go');
     final readout = addControl(ControlKind.display, 'Held');
     syncController();
-    final latch = node('text.fromPower');
-    wire(kControllerNodeId, '${go.id}.pressed', latch.id, 'set1');
-    wire(kControllerNodeId, '${go.id}.released', latch.id, 'set0');
-    wire(latch.id, 'result', kControllerNodeId, '${readout.id}.value');
+    final probe = node('text.fromPower');
+    wire(kControllerNodeId, '${go.id}.pressed', probe.id, 'power');
+    wire(probe.id, 'result', kControllerNodeId, '${readout.id}.value');
 
     final r = runner();
     expect(r.displayValue(readout.id), '0'); // nothing pressed yet
@@ -278,6 +277,55 @@ void main() {
     expect(r.displayValue(readout.id), '1');
     r.buttonReleased(go.id);
     expect(r.displayValue(readout.id), '0');
+  });
+
+  test('power → string follows a held d-pad direction', () {
+    final drive = addControl(ControlKind.dpad, 'Drive');
+    final readout = addControl(ControlKind.display, 'Up?');
+    syncController();
+    final probe = node('text.fromPower');
+    wire(kControllerNodeId, '${drive.id}.up', probe.id, 'power');
+    wire(probe.id, 'result', kControllerNodeId, '${readout.id}.value');
+
+    final r = runner();
+    expect(r.displayValue(readout.id), '0');
+    r.dpadPressed(drive.id, 'up');
+    expect(r.displayValue(readout.id), '1');
+    r.dpadReleased(drive.id);
+    expect(r.displayValue(readout.id), '0');
+  });
+
+  test('power → string wired to released is the inverse of held', () {
+    final go = addControl(ControlKind.button, 'Go');
+    final readout = addControl(ControlKind.display, 'Idle?');
+    syncController();
+    final probe = node('text.fromPower');
+    wire(kControllerNodeId, '${go.id}.released', probe.id, 'power');
+    wire(probe.id, 'result', kControllerNodeId, '${readout.id}.value');
+
+    final r = runner();
+    expect(r.displayValue(readout.id), '1'); // not held → power on released
+    r.buttonPressed(go.id);
+    expect(r.displayValue(readout.id), '0');
+    r.buttonReleased(go.id);
+    expect(r.displayValue(readout.id), '1');
+  });
+
+  test('power → string blinks 1 for pulse-only sources', () async {
+    final fast = addControl(ControlKind.toggle, 'Fast');
+    final readout = addControl(ControlKind.display, 'Blink');
+    syncController();
+    final probe = node('text.fromPower');
+    wire(kControllerNodeId, '${fast.id}.switched', probe.id, 'power');
+    wire(probe.id, 'result', kControllerNodeId, '${readout.id}.value');
+
+    final r = runner();
+    expect(r.displayValue(readout.id), '0');
+    r.toggleChanged(fast.id, true); // the switch pulse
+    expect(r.displayValue(readout.id), '1');
+    await Future<void>.delayed(const Duration(milliseconds: 350));
+    expect(r.displayValue(readout.id), '0');
+    r.dispose();
   });
 
   test('a display cannot take an int wire directly', () {

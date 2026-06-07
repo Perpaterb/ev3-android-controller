@@ -190,7 +190,7 @@ class _BlueprintEditorState extends State<BlueprintEditor> {
     final converterInput = switch (defId) {
       'text.fromInt' => 'number',
       'text.fromBool' => 'value',
-      _ => 'set1', // text.fromPower: power means "make it 1"
+      _ => 'power', // text.fromPower
     };
     final fromNode = _graph.node(output.nodeId);
     final toNode = _graph.node(input.nodeId);
