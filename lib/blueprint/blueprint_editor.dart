@@ -197,11 +197,48 @@ class _BlueprintEditorState extends State<BlueprintEditor> {
 
   // ---- node actions ------------------------------------------------------
 
+  /// Long-press on empty canvas. Normally shows the whole catalog; while
+  /// wiring it shows only nodes that can take the wire, and auto-connects
+  /// the one placed — so "hardcode a value into this pin" is: tap the pin,
+  /// hold empty space, pick Number.
   Future<void> _addNodeAt(Offset canvasPosition) async {
-    final def = await showAddNodeSheet(context);
+    final from = _wiringFrom;
+    final defs = from == null
+        ? null
+        : nodeCatalog.where((d) => _defConnectsTo(d, from)).toList();
+    final def = await showAddNodeSheet(
+      context,
+      defs: defs,
+      hint: from == null
+          ? null
+          : 'Showing nodes that can connect to your wire — '
+              'it will hook up automatically.',
+    );
     if (def == null) return;
     final node = _graph.addNode(def, canvasPosition);
-    setState(() => _selectedNodeId = node.id);
+    if (from != null) {
+      final target = _firstCompatiblePin(node, from);
+      if (target != null) _graph.connect(from, target);
+    }
+    setState(() {
+      _selectedNodeId = node.id;
+      _wiringFrom = null;
+    });
+  }
+
+  bool _defConnectsTo(NodeDef def, PinRef from) {
+    final fromType = _graph.pinType(from);
+    final pins = from.isOutput ? def.inputs : def.outputs;
+    return pins.any((p) => p.type == fromType);
+  }
+
+  PinRef? _firstCompatiblePin(GraphNode node, PinRef from) {
+    final wantOutput = !from.isOutput;
+    for (final spec in wantOutput ? node.def.outputs : node.def.inputs) {
+      final ref = PinRef(node.id, spec.id, isOutput: wantOutput);
+      if (_graph.canConnect(from, ref)) return ref;
+    }
+    return null;
   }
 
   Future<void> _renameNode(GraphNode node) async {
@@ -549,7 +586,7 @@ class _BlueprintEditorState extends State<BlueprintEditor> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 const Text(
-                  'Tap a glowing pin to connect',
+                  'Tap a glowing pin — or hold empty space to add a node',
                   style: TextStyle(color: Colors.white),
                 ),
                 const SizedBox(width: 10),

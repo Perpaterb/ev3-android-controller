@@ -3,9 +3,17 @@ import 'package:flutter/material.dart';
 import '../model/node_def.dart';
 import '../model/pins.dart';
 
-/// Bottom sheet listing every node in the catalog, grouped and colour-coded
-/// by category. Returns the chosen [NodeDef], or null if dismissed.
-Future<NodeDef?> showAddNodeSheet(BuildContext context) {
+/// Bottom sheet listing nodes grouped and colour-coded by category.
+/// Returns the chosen [NodeDef], or null if dismissed.
+///
+/// [defs] narrows the list (e.g. only nodes compatible with the wire being
+/// drawn); [hint] explains the narrowing to the user.
+Future<NodeDef?> showAddNodeSheet(
+  BuildContext context, {
+  List<NodeDef>? defs,
+  String? hint,
+}) {
+  final available = defs ?? nodeCatalog;
   return showModalBottomSheet<NodeDef>(
     context: context,
     isScrollControlled: true,
@@ -20,9 +28,18 @@ Future<NodeDef?> showAddNodeSheet(BuildContext context) {
           children: [
             Text('Add a node',
                 style: Theme.of(context).textTheme.titleLarge),
+            if (hint != null) ...[
+              const SizedBox(height: 4),
+              Text(hint, style: Theme.of(context).textTheme.bodySmall),
+            ],
             const SizedBox(height: 8),
+            if (available.isEmpty)
+              const Padding(
+                padding: EdgeInsets.all(12),
+                child: Text('Nothing in the toolbox can connect to that pin.'),
+              ),
             for (final category in NodeCategory.values)
-              ..._buildCategory(context, category),
+              ..._buildCategory(context, category, available),
           ],
         ),
       ),
@@ -30,8 +47,9 @@ Future<NodeDef?> showAddNodeSheet(BuildContext context) {
   );
 }
 
-List<Widget> _buildCategory(BuildContext context, NodeCategory category) {
-  final defs = nodeCatalog.where((d) => d.category == category).toList();
+List<Widget> _buildCategory(
+    BuildContext context, NodeCategory category, List<NodeDef> available) {
+  final defs = available.where((d) => d.category == category).toList();
   if (defs.isEmpty) return const [];
   return [
     Padding(

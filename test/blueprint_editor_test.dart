@@ -75,6 +75,43 @@ void main() {
     expect(userNodes(saved).single['def'], 'math.add');
   });
 
+  testWidgets(
+      'long-press while wiring filters the menu and auto-connects the node',
+      (tester) async {
+    final graph = seed();
+    final motor =
+        graph.addNode(nodeDefById('motor.run')!, const Offset(-700, -200));
+    persist(graph);
+    await pumpEditor(tester);
+
+    // Start a wire from the motor's int Speed input…
+    await tester.tap(pin(motor, 'speed', isOutput: false));
+    await tester.pump();
+    // …then hold empty canvas to add a node into it.
+    await tester.longPressAt(const Offset(200, 1000));
+    await tester.pumpAndSettle();
+
+    // Menu only offers nodes with a compatible (int output) pin.
+    expect(find.byKey(const Key('add-node-value.int')), findsOneWidget);
+    expect(find.byKey(const Key('add-node-math.add')), findsOneWidget);
+    expect(find.byKey(const Key('add-node-value.bool')), findsNothing);
+    expect(find.byKey(const Key('add-node-flow.branch')), findsNothing);
+
+    await tester.tap(find.byKey(const Key('add-node-value.int')));
+    await tester.pumpAndSettle();
+
+    // Node was placed, auto-wired into Speed, and wiring mode ended.
+    expect(find.byKey(const Key('cancel-wiring')), findsNothing);
+    final saved = await savedGraph(tester);
+    final wires = saved['wires'] as List;
+    expect(wires, hasLength(1));
+    expect(wires.single['toNode'], motor.id);
+    expect(wires.single['toPin'], 'speed');
+    final number =
+        userNodes(saved).singleWhere((n) => n['def'] == 'value.int');
+    expect(wires.single['fromNode'], number['id']);
+  });
+
   testWidgets('dragging the header moves the node', (tester) async {
     final graph = seed();
     final node = graph.addNode(nodeDefById('math.add')!, const Offset(-700, -400));
