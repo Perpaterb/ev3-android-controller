@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../blueprint/blueprint_editor.dart';
 import '../models/project.dart';
 import '../services/project_store.dart';
 
@@ -51,11 +52,8 @@ class _ProjectScreenState extends State<ProjectScreen> {
         ],
       ),
       body: switch (_mode) {
-        ProjectMode.build => const _Placeholder(
-            icon: Icons.account_tree_outlined,
-            label: 'Build mode',
-            detail: 'The blueprint editor goes here.',
-          ),
+        ProjectMode.build =>
+          BlueprintEditor(store: widget.store, project: widget.project),
         ProjectMode.run => const _Placeholder(
             icon: Icons.sports_esports_outlined,
             label: 'Run mode',
