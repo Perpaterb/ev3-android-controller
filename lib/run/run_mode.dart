@@ -4,24 +4,30 @@ import '../blueprint/model/controller_layout.dart';
 import '../blueprint/model/graph.dart';
 import '../blueprint/model/node_def.dart';
 import '../models/project.dart';
+import '../services/brick_connection.dart';
 import '../services/ev3_brick.dart';
+import 'connect_sheet.dart';
 import 'graph_runner.dart';
 
 /// Run mode: the controller the kid designed, full screen and live.
 ///
 /// Control events run through the blueprint graph via [GraphRunner] and out
-/// to the brick. For now the brick is always the practice-mode mock; the
-/// real Bluetooth brick (Epic 2) will slot into the same field.
+/// to whichever brick is active: the real EV3 when [connection] is
+/// connected, the practice-mode mock otherwise.
 ///
 /// Safety (R-05): every motor is stopped when this screen goes away or the
 /// app loses focus.
 class RunMode extends StatefulWidget {
-  const RunMode({super.key, required this.project, this.brick});
+  const RunMode(
+      {super.key, required this.project, this.brick, this.connection});
 
   final Project project;
 
-  /// Injectable for tests; defaults to a fresh [MockEv3Brick].
+  /// Test override; takes precedence over [connection].
   final Ev3Brick? brick;
+
+  /// The app-wide Bluetooth connection, if this platform has one.
+  final BrickConnection? connection;
 
   @override
   State<RunMode> createState() => _RunModeState();
@@ -29,29 +35,50 @@ class RunMode extends StatefulWidget {
 
 class _RunModeState extends State<RunMode> with WidgetsBindingObserver {
   late final ControllerLayout _layout;
-  late final Ev3Brick _brick;
   late final GraphRunner _runner;
+  final MockEv3Brick _practice = MockEv3Brick();
   int _activeTab = 0;
   bool _showLog = false;
+  bool _lossShown = false;
+
+  Ev3Brick get _activeBrick =>
+      widget.brick ?? widget.connection?.brick ?? _practice;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    widget.connection?.addListener(_onConnectionChanged);
     _layout = ControllerLayout.fromJson(widget.project.controller);
     final graph = BlueprintGraph.fromJson(
       widget.project.graph,
       dynamicDefs: {kControllerDefId: _layout.buildNodeDef()},
     );
-    _brick = widget.brick ?? MockEv3Brick();
-    _runner = GraphRunner(graph: graph, layout: _layout, brick: _brick);
+    _runner =
+        GraphRunner(graph: graph, layout: _layout, brick: _activeBrick);
   }
 
   @override
   void dispose() {
-    _brick.stopAll(); // leaving Run mode must never leave motors running
+    _activeBrick.stopAll(); // never leave motors running behind us
+    widget.connection?.removeListener(_onConnectionChanged);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  void _onConnectionChanged() {
+    if (!mounted) return;
+    setState(() => _runner.brick = _activeBrick);
+    final connection = widget.connection!;
+    if (connection.connectionWasLost && !_lossShown) {
+      _lossShown = true;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Lost the robot! Back to practice mode.'),
+      ));
+    }
+    if (connection.state == BrickConnectionState.connected) {
+      _lossShown = false;
+    }
   }
 
   @override
@@ -59,7 +86,7 @@ class _RunModeState extends State<RunMode> with WidgetsBindingObserver {
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.hidden ||
         state == AppLifecycleState.detached) {
-      _brick.stopAll();
+      _activeBrick.stopAll();
     }
   }
 
@@ -108,12 +135,7 @@ class _RunModeState extends State<RunMode> with WidgetsBindingObserver {
       padding: const EdgeInsets.fromLTRB(12, 8, 4, 0),
       child: Row(
         children: [
-          Chip(
-            avatar: const Icon(Icons.smart_toy_outlined, size: 16),
-            label: const Text('Practice mode — pretend robot'),
-            labelStyle: const TextStyle(fontSize: 12),
-            visualDensity: VisualDensity.compact,
-          ),
+          _buildConnectionChip(),
           const Spacer(),
           IconButton(
             key: const Key('toggle-log'),
@@ -126,6 +148,45 @@ class _RunModeState extends State<RunMode> with WidgetsBindingObserver {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildConnectionChip() {
+    final connection = widget.connection;
+    final (icon, color, label) = switch (connection?.state) {
+      BrickConnectionState.connected => (
+          Icons.bluetooth_connected,
+          Colors.green,
+          'Connected to ${connection!.deviceName}',
+        ),
+      BrickConnectionState.connecting => (
+          Icons.bluetooth_searching,
+          Colors.amber,
+          'Connecting…',
+        ),
+      _ => (
+          Icons.smart_toy_outlined,
+          null,
+          connection != null && connection.supported
+              ? 'Practice mode — tap to connect'
+              : 'Practice mode — pretend robot',
+        ),
+    };
+    final chipLabel = Text(label, style: const TextStyle(fontSize: 12));
+    final avatar = Icon(icon, size: 16, color: color as Color?);
+    if (connection == null || !connection.supported) {
+      return Chip(
+        avatar: avatar,
+        label: chipLabel,
+        visualDensity: VisualDensity.compact,
+      );
+    }
+    return ActionChip(
+      key: const Key('connection-chip'),
+      avatar: avatar,
+      label: chipLabel,
+      visualDensity: VisualDensity.compact,
+      onPressed: () => showConnectSheet(context, connection),
     );
   }
 
@@ -152,22 +213,22 @@ class _RunModeState extends State<RunMode> with WidgetsBindingObserver {
   }
 
   Widget _buildLogPanel() {
-    final mock = _brick;
+    final brick = _activeBrick;
     return Container(
       height: 150,
       width: double.infinity,
       color: Colors.black54,
       padding: const EdgeInsets.all(8),
-      child: mock is MockEv3Brick
+      child: brick is MockEv3Brick
           ? ListenableBuilder(
-              listenable: mock,
-              builder: (context, _) => mock.log.isEmpty
+              listenable: brick,
+              builder: (context, _) => brick.log.isEmpty
                   ? const Text('No commands yet — press something!',
                       style: TextStyle(color: Colors.white38, fontSize: 12))
                   : ListView(
                       reverse: true,
                       children: [
-                        for (final entry in mock.log.reversed)
+                        for (final entry in brick.log.reversed)
                           Text(entry,
                               style: const TextStyle(
                                 color: Colors.white70,
@@ -177,7 +238,8 @@ class _RunModeState extends State<RunMode> with WidgetsBindingObserver {
                       ],
                     ),
             )
-          : const SizedBox.shrink(),
+          : const Text('Connected — commands go to your real EV3!',
+              style: TextStyle(color: Colors.white70, fontSize: 12)),
     );
   }
 

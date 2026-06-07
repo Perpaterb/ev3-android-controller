@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
 
 import '../models/project.dart';
+import '../services/brick_connection.dart';
 import '../services/project_store.dart';
 import 'project_screen.dart';
 
 /// Home screen: the list of projects with create / open / rename / delete.
 class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key, required this.store});
+  const HomeScreen({super.key, required this.store, this.connection});
 
   final ProjectStore store;
+  final BrickConnection? connection;
 
   Future<void> _createProject(BuildContext context) async {
     final name = await _promptForName(
@@ -25,7 +27,8 @@ class HomeScreen extends StatelessWidget {
 
   void _openProject(BuildContext context, Project project) {
     Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => ProjectScreen(store: store, project: project),
+      builder: (_) => ProjectScreen(
+          store: store, project: project, connection: connection),
     ));
   }
 

@@ -1,4 +1,13 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Bluetooth Classic (SPP) to the EV3 brick. Legacy permissions cap at
+         API 30; BLUETOOTH_CONNECT replaces them from Android 12. No
+         BLUETOOTH_SCAN needed: we only list already-paired devices. -->
+    <uses-permission android:name="android.permission.BLUETOOTH"
+        android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN"
+        android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+
     <application
         android:label="BrickLogic"
         android:name="${applicationName}"

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../blueprint/blueprint_editor.dart';
 import '../models/project.dart';
 import '../run/run_mode.dart';
+import '../services/brick_connection.dart';
 import '../services/project_store.dart';
 
 enum ProjectMode { build, run }
@@ -12,10 +13,15 @@ enum ProjectMode { build, run }
 ///
 /// Both areas are placeholders until their epics land.
 class ProjectScreen extends StatefulWidget {
-  const ProjectScreen({super.key, required this.store, required this.project});
+  const ProjectScreen(
+      {super.key,
+      required this.store,
+      required this.project,
+      this.connection});
 
   final ProjectStore store;
   final Project project;
+  final BrickConnection? connection;
 
   @override
   State<ProjectScreen> createState() => _ProjectScreenState();
@@ -55,7 +61,8 @@ class _ProjectScreenState extends State<ProjectScreen> {
       body: switch (_mode) {
         ProjectMode.build =>
           BlueprintEditor(store: widget.store, project: widget.project),
-        ProjectMode.run => RunMode(project: widget.project),
+        ProjectMode.run => RunMode(
+            project: widget.project, connection: widget.connection),
       },
     );
   }

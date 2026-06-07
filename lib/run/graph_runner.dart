@@ -41,7 +41,10 @@ class GraphRunner extends ChangeNotifier {
 
   final BlueprintGraph graph;
   final ControllerLayout layout;
-  final Ev3Brick brick;
+
+  /// Swappable mid-run: connecting/disconnecting the real brick replaces
+  /// this without rebuilding the runner (control state survives).
+  Ev3Brick brick;
 
   /// Live state of stateful controls: sliderId → int, toggleId → bool.
   final Map<String, Object> _controlValues = {};
