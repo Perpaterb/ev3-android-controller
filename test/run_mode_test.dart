@@ -143,6 +143,34 @@ void main() {
     expect(find.text('--'), findsOneWidget);
   });
 
+  testWidgets('a scaled-up control renders bigger on screen', (tester) async {
+    final go = addControl(ControlKind.button, 'Go',
+        position: const Offset(0.3, 0.5));
+    final big = addControl(ControlKind.button, 'Big',
+        position: const Offset(0.7, 0.5));
+    layout.setControlScale(big.id, 2.0);
+    seed();
+    await pumpRunMode(tester);
+
+    final normal = tester.getRect(find.byKey(Key('run-control-${go.id}')));
+    final scaled = tester.getRect(find.byKey(Key('run-control-${big.id}')));
+    expect(scaled.width, closeTo(normal.width * 2, 0.5));
+    expect(scaled.height, closeTo(normal.height * 2, 0.5));
+  });
+
+  testWidgets('the stage matches the tab orientation', (tester) async {
+    addControl(ControlKind.button, 'Go');
+    layout.setTabOrientation(layout.tabs.single.id, landscape: false);
+    seed();
+    await pumpRunMode(tester);
+
+    // The portrait stage is taller than wide, and the control still works.
+    final stage = tester.getSize(find.byKey(const Key('run-stage')));
+    expect(find.text('Go'), findsOneWidget);
+    expect(stage.height, greaterThan(stage.width));
+    expect(stage.width / stage.height, closeTo(9 / 16, 0.01));
+  });
+
   testWidgets('tabs switch between control pages', (tester) async {
     addControl(ControlKind.button, 'Drive');
     final arm = layout.addTab('Arm');

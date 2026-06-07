@@ -35,11 +35,14 @@ class ControllerControl {
   final ControlKind kind;
   String name;
 
-  /// Fractional (0-1) centre within the tab area, so the Run-mode renderer
-  /// can scale the layout to any screen.
+  /// Fractional (0-1) centre within the tab's stage, so the Run-mode
+  /// renderer can scale the layout to any screen.
   Offset position;
 
   final Map<String, dynamic> config;
+
+  /// User-chosen size multiplier (see [ControllerLayout.setControlScale]).
+  double get scale => (config['scale'] as num?)?.toDouble() ?? 1.0;
 
   /// What this control *emits* — pins on the right of the controller node.
   List<PinSpec> get outputPins => switch (kind) {
@@ -106,28 +109,52 @@ class ControllerControl {
 
 /// One page of controls.
 class ControllerTab {
-  ControllerTab({required this.id, required this.name,
-      List<ControllerControl>? controls})
-      : controls = controls ?? [];
+  ControllerTab({
+    required this.id,
+    required this.name,
+    this.landscape = true,
+    List<ControllerControl>? controls,
+  }) : controls = controls ?? [];
 
   final String id;
   String name;
+
+  /// Screen orientation this page is designed for.
+  bool landscape;
+
   final List<ControllerControl> controls;
+
+  /// Width-to-height ratio of this tab's stage — shared by the designer
+  /// miniature and the Run screen so layouts match exactly.
+  double get aspect => landscape ? 16 / 9 : 9 / 16;
 
   Map<String, dynamic> toJson() => {
         'id': id,
         'name': name,
+        'landscape': landscape,
         'controls': controls.map((c) => c.toJson()).toList(),
       };
 
   factory ControllerTab.fromJson(Map<String, dynamic> json) => ControllerTab(
         id: json['id'] as String,
         name: json['name'] as String,
+        landscape: json['landscape'] as bool? ?? true,
         controls: [
           for (final raw in (json['controls'] as List? ?? const []))
             ?ControllerControl.fromJson((raw as Map).cast<String, dynamic>()),
         ],
       );
+}
+
+/// Largest size of the given aspect ratio that fits inside [available].
+Size fitAspect(Size available, double aspect) {
+  var width = available.width;
+  var height = width / aspect;
+  if (height > available.height) {
+    height = available.height;
+    width = height * aspect;
+  }
+  return Size(width, height);
 }
 
 /// The whole controller design: tabs of controls. Always has at least one
@@ -193,6 +220,13 @@ class ControllerLayout extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setTabOrientation(String id, {required bool landscape}) {
+    final tab = _tabs.where((t) => t.id == id).firstOrNull;
+    if (tab == null || tab.landscape == landscape) return;
+    tab.landscape = landscape;
+    notifyListeners();
+  }
+
   /// Refuses to remove the last tab — a controller always has one page.
   bool removeTab(String id) {
     if (_tabs.length <= 1) return false;
@@ -245,6 +279,14 @@ class ControllerLayout extends ChangeNotifier {
     final target = control(id);
     if (target == null) return;
     target.position = _clampFraction(target.position + fractionalDelta);
+    notifyListeners();
+  }
+
+  /// Sets a control's size multiplier, clamped to 50%–200%.
+  void setControlScale(String id, double scale) {
+    final target = control(id);
+    if (target == null) return;
+    target.config['scale'] = scale.clamp(0.5, 2.0);
     notifyListeners();
   }
 

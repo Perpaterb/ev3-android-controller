@@ -1,3 +1,5 @@
+import 'dart:ui' show Size;
+
 import 'package:ev3_controller/blueprint/model/controller_layout.dart';
 import 'package:ev3_controller/blueprint/model/pins.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -162,6 +164,50 @@ void main() {
     );
     expect(layout.defaultControlName(ControlKind.button), 'Button 2');
     expect(layout.defaultControlName(ControlKind.slider), 'Slider 1');
+  });
+
+  test('tabs default to landscape; orientation flips and persists', () {
+    final tab = layout.tabs.single;
+    expect(tab.landscape, isTrue);
+    expect(tab.aspect, greaterThan(1));
+
+    layout.setTabOrientation(tab.id, landscape: false);
+    expect(tab.landscape, isFalse);
+    expect(tab.aspect, lessThan(1));
+
+    final copy = ControllerLayout.fromJson(layout.toJson());
+    expect(copy.tabs.single.landscape, isFalse);
+  });
+
+  test('control scale defaults to 1, clamps, and persists', () {
+    final control = layout.addControl(
+      tabId: layout.tabs.single.id,
+      kind: ControlKind.button,
+      name: 'Go',
+      position: const Offset(0.5, 0.5),
+    );
+    expect(control.scale, 1.0);
+
+    layout.setControlScale(control.id, 1.5);
+    expect(control.scale, 1.5);
+    layout.setControlScale(control.id, 99);
+    expect(control.scale, 2.0);
+    layout.setControlScale(control.id, 0.1);
+    expect(control.scale, 0.5);
+
+    layout.setControlScale(control.id, 1.5);
+    final copy = ControllerLayout.fromJson(layout.toJson());
+    expect(copy.control(control.id)!.scale, 1.5);
+  });
+
+  test('fitAspect letterboxes to the limiting dimension', () {
+    expect(fitAspect(const Size(160, 1000), 16 / 9),
+        const Size(160, 90)); // width-limited
+    expect(fitAspect(const Size(1000, 90), 16 / 9),
+        const Size(160, 90)); // height-limited
+    final portrait = fitAspect(const Size(1000, 160), 9 / 16);
+    expect(portrait.height, 160);
+    expect(portrait.width, 90);
   });
 
   test('JSON round-trips tabs, controls, names and config', () {

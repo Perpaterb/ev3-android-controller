@@ -284,27 +284,58 @@ class _BlueprintEditorState extends State<BlueprintEditor> {
     final action = await showModalBottomSheet<String>(
       context: context,
       builder: (context) => SafeArea(
-        child: ListView(
-          shrinkWrap: true,
-          children: [
-            ListTile(
-              title: Text(control.name,
-                  style: Theme.of(context).textTheme.titleMedium),
-              subtitle: Text(control.kind.label),
-            ),
-            ListTile(
-              key: const Key('control-rename'),
-              leading: const Icon(Icons.edit),
-              title: const Text('Rename'),
-              onTap: () => Navigator.pop(context, 'rename'),
-            ),
-            ListTile(
-              key: const Key('control-delete'),
-              leading: const Icon(Icons.delete),
-              title: const Text('Delete'),
-              onTap: () => Navigator.pop(context, 'delete'),
-            ),
-          ],
+        child: StatefulBuilder(
+          builder: (context, setSheetState) => ListView(
+            shrinkWrap: true,
+            children: [
+              ListTile(
+                title: Text(control.name,
+                    style: Theme.of(context).textTheme.titleMedium),
+                subtitle: Text(control.kind.label),
+              ),
+              // Live size slider — the control resizes behind the sheet.
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  children: [
+                    const Icon(Icons.photo_size_select_large),
+                    const SizedBox(width: 8),
+                    const Text('Size'),
+                    Expanded(
+                      child: Slider(
+                        key: const Key('control-size'),
+                        min: 0.5,
+                        max: 2.0,
+                        divisions: 6,
+                        label: '${(control.scale * 100).round()}%',
+                        value: control.scale,
+                        onChanged: (value) {
+                          _layout.setControlScale(control.id, value);
+                          setSheetState(() {});
+                        },
+                      ),
+                    ),
+                    SizedBox(
+                      width: 44,
+                      child: Text('${(control.scale * 100).round()}%'),
+                    ),
+                  ],
+                ),
+              ),
+              ListTile(
+                key: const Key('control-rename'),
+                leading: const Icon(Icons.edit),
+                title: const Text('Rename'),
+                onTap: () => Navigator.pop(context, 'rename'),
+              ),
+              ListTile(
+                key: const Key('control-delete'),
+                leading: const Icon(Icons.delete),
+                title: const Text('Delete'),
+                onTap: () => Navigator.pop(context, 'delete'),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -349,6 +380,15 @@ class _BlueprintEditorState extends State<BlueprintEditor> {
               subtitle: const Text('Controller tab'),
             ),
             ListTile(
+              key: const Key('tab-rotate'),
+              leading: const Icon(Icons.screen_rotation),
+              title: Text(tab.landscape ? 'Make portrait' : 'Make landscape'),
+              subtitle: Text(tab.landscape
+                  ? 'Hold the phone upright for this page'
+                  : 'Hold the phone sideways for this page'),
+              onTap: () => Navigator.pop(context, 'rotate'),
+            ),
+            ListTile(
               key: const Key('tab-rename'),
               leading: const Icon(Icons.edit),
               title: const Text('Rename'),
@@ -369,6 +409,8 @@ class _BlueprintEditorState extends State<BlueprintEditor> {
     );
     if (!mounted) return;
     switch (action) {
+      case 'rotate':
+        _layout.setTabOrientation(tab.id, landscape: !tab.landscape);
       case 'rename':
         final name = await _promptForText(
           title: 'Rename tab',

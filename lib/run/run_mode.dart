@@ -105,22 +105,39 @@ class _RunModeState extends State<RunMode> with WidgetsBindingObserver {
           Expanded(
             child: LayoutBuilder(
               builder: (context, constraints) {
-                final area = constraints.biggest;
-                return ListenableBuilder(
-                  listenable: _runner,
-                  builder: (context, _) => Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      if (tab.controls.isEmpty)
-                        const Center(
-                          child: Text(
-                            'No controls yet — add some in Build!',
-                            style: TextStyle(color: Colors.white38),
-                          ),
-                        ),
-                      for (final control in tab.controls)
-                        _buildControl(control, area),
-                    ],
+                // Same aspect-ratio stage as the designer miniature, so the
+                // layout lands exactly where it was designed.
+                final stage = fitAspect(
+                  Size(constraints.maxWidth - 16, constraints.maxHeight - 16),
+                  tab.aspect,
+                );
+                return Center(
+                  child: Container(
+                    key: const Key('run-stage'),
+                    width: stage.width,
+                    height: stage.height,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1A2028),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.white10),
+                    ),
+                    child: ListenableBuilder(
+                      listenable: _runner,
+                      builder: (context, _) => Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          if (tab.controls.isEmpty)
+                            const Center(
+                              child: Text(
+                                'No controls yet — add some in Build!',
+                                style: TextStyle(color: Colors.white38),
+                              ),
+                            ),
+                          for (final control in tab.controls)
+                            _buildControl(control, stage),
+                        ],
+                      ),
+                    ),
                   ),
                 );
               },
@@ -247,8 +264,9 @@ class _RunModeState extends State<RunMode> with WidgetsBindingObserver {
 
   // ---- controls ------------------------------------------------------------
 
-  Widget _buildControl(ControllerControl control, Size area) {
-    final size = _controlSize(control.kind);
+  Widget _buildControl(ControllerControl control, Size stage) {
+    final base = _controlSize(control.kind);
+    final size = base * control.scale;
     final child = switch (control.kind) {
       ControlKind.button => _RunButton(control: control, runner: _runner),
       ControlKind.dpad => _RunDpad(control: control, runner: _runner),
@@ -258,10 +276,17 @@ class _RunModeState extends State<RunMode> with WidgetsBindingObserver {
       ControlKind.display => _RunDisplay(control: control, runner: _runner),
     };
     return Positioned(
-      left: control.position.dx * area.width - size.width / 2,
-      top: control.position.dy * area.height - size.height / 2,
+      left: control.position.dx * stage.width - size.width / 2,
+      top: control.position.dy * stage.height - size.height / 2,
       child: SizedBox(
-          width: size.width, height: size.height, child: child),
+        width: size.width,
+        height: size.height,
+        child: FittedBox(
+          fit: BoxFit.contain,
+          child: SizedBox(
+              width: base.width, height: base.height, child: child),
+        ),
+      ),
     );
   }
 

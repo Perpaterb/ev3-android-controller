@@ -247,37 +247,47 @@ class _ControllerNodeWidgetState extends State<ControllerNodeWidget> {
   Widget _buildLayoutArea(ControllerTab tab) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final area = constraints.biggest;
-        return GestureDetector(
-          key: const Key('controller-layout-area'),
-          behavior: HitTestBehavior.opaque,
-          onLongPressStart: (details) => widget.onAddControl(
-            tab.id,
-            Offset(
-              details.localPosition.dx / area.width,
-              details.localPosition.dy / area.height,
+        // The stage keeps the same aspect ratio as the Run screen (per the
+        // tab's orientation), letterboxed inside the available area, so
+        // what you lay out here is exactly what you get when you run it.
+        final stage = fitAspect(
+          Size(constraints.maxWidth - 8, constraints.maxHeight - 8),
+          tab.aspect,
+        );
+        return Center(
+          child: GestureDetector(
+            key: const Key('controller-layout-area'),
+            behavior: HitTestBehavior.opaque,
+            onLongPressStart: (details) => widget.onAddControl(
+              tab.id,
+              Offset(
+                details.localPosition.dx / stage.width,
+                details.localPosition.dy / stage.height,
+              ),
             ),
-          ),
-          child: Container(
-            decoration: BoxDecoration(
-              color: const Color(0xFF1A1F26),
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(color: Colors.white12),
-            ),
-            child: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                if (tab.controls.isEmpty)
-                  const Center(
-                    child: Text(
-                      'Hold here to add\na button, slider…',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.white30, fontSize: 11),
+            child: Container(
+              width: stage.width,
+              height: stage.height,
+              decoration: BoxDecoration(
+                color: const Color(0xFF1A1F26),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: Colors.white12),
+              ),
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  if (tab.controls.isEmpty)
+                    const Center(
+                      child: Text(
+                        'Hold here to add\na button, slider…',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.white30, fontSize: 11),
+                      ),
                     ),
-                  ),
-                for (final control in tab.controls)
-                  _buildControl(control, area),
-              ],
+                  for (final control in tab.controls)
+                    _buildControl(control, stage),
+                ],
+              ),
             ),
           ),
         );
@@ -285,11 +295,11 @@ class _ControllerNodeWidgetState extends State<ControllerNodeWidget> {
     );
   }
 
-  Widget _buildControl(ControllerControl control, Size area) {
-    final size = _controlSize(control.kind);
+  Widget _buildControl(ControllerControl control, Size stage) {
+    final size = _controlSize(control.kind) * control.scale;
     return Positioned(
-      left: control.position.dx * area.width - size.width / 2,
-      top: control.position.dy * area.height - size.height / 2,
+      left: control.position.dx * stage.width - size.width / 2,
+      top: control.position.dy * stage.height - size.height / 2,
       child: GestureDetector(
         key: Key('control-${control.id}'),
         behavior: HitTestBehavior.opaque,
@@ -300,10 +310,17 @@ class _ControllerNodeWidgetState extends State<ControllerNodeWidget> {
         onLongPress: () => widget.onControlMenu(control),
         onPanUpdate: (details) => widget.onMoveControl(
           control,
-          Offset(details.delta.dx / area.width,
-              details.delta.dy / area.height),
+          Offset(details.delta.dx / stage.width,
+              details.delta.dy / stage.height),
         ),
-        child: _ControlVisual(control: control),
+        child: SizedBox(
+          width: size.width,
+          height: size.height,
+          child: FittedBox(
+            fit: BoxFit.contain,
+            child: _ControlVisual(control: control),
+          ),
+        ),
       ),
     );
   }
