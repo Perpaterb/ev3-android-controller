@@ -192,14 +192,14 @@ const List<NodeDef> nodeCatalog = [
   // Values
   NodeDef(
     id: 'value.int',
-    title: 'Number',
+    title: 'Integer',
     category: NodeCategory.value,
     configKind: NodeConfigKind.intValue,
     outputs: [PinSpec('value', 'Value', PinType.integer)],
   ),
   NodeDef(
     id: 'value.bool',
-    title: 'Yes / No',
+    title: 'Boolean True / False',
     category: NodeCategory.value,
     configKind: NodeConfigKind.boolValue,
     outputs: [PinSpec('value', 'Value', PinType.boolean)],
