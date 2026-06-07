@@ -322,6 +322,16 @@ class _BlueprintEditorState extends State<BlueprintEditor> {
                   ],
                 ),
               ),
+              SwitchListTile(
+                key: const Key('control-show-name'),
+                secondary: const Icon(Icons.label_outline),
+                title: const Text('Show name when running'),
+                value: control.showName,
+                onChanged: (value) {
+                  _layout.setControlShowName(control.id, value);
+                  setSheetState(() {});
+                },
+              ),
               ListTile(
                 key: const Key('control-rename'),
                 leading: const Icon(Icons.edit),

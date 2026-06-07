@@ -278,18 +278,23 @@ class _RunModeState extends State<RunMode> with WidgetsBindingObserver {
       ControlKind.light => _RunLight(control: control, runner: _runner),
       ControlKind.display => _RunDisplay(control: control, runner: _runner),
     };
+    // Output-only controls must never swallow a touch meant for whatever is
+    // underneath them.
+    final passive = control.kind == ControlKind.light ||
+        control.kind == ControlKind.display;
+    final sized = SizedBox(
+      width: size.width,
+      height: size.height,
+      child: FittedBox(
+        fit: BoxFit.contain,
+        child:
+            SizedBox(width: base.width, height: base.height, child: child),
+      ),
+    );
     return Positioned(
       left: control.position.dx * stage.width - size.width / 2,
       top: control.position.dy * stage.height - size.height / 2,
-      child: SizedBox(
-        width: size.width,
-        height: size.height,
-        child: FittedBox(
-          fit: BoxFit.contain,
-          child: SizedBox(
-              width: base.width, height: base.height, child: child),
-        ),
-      ),
+      child: passive ? IgnorePointer(child: sized) : sized,
     );
   }
 
@@ -338,15 +343,17 @@ class _RunButtonState extends State<_RunButton> {
           border: Border.all(color: Colors.white24, width: 2),
         ),
         child: Center(
-          child: Text(
-            widget.control.name,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
+          child: widget.control.showName
+              ? Text(
+                  widget.control.name,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                )
+              : const SizedBox.shrink(),
         ),
       ),
     );
@@ -390,10 +397,12 @@ class _RunDpad extends StatelessWidget {
               width: 48,
               height: 48,
               child: Center(
-                child: Text(control.name,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
-                    style: _controlNameStyle),
+                child: control.showName
+                    ? Text(control.name,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                        style: _controlNameStyle)
+                    : null,
               ),
             ),
             _arrow('right', Icons.keyboard_arrow_right),
@@ -443,8 +452,12 @@ class _RunSlider extends StatelessWidget {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Text('${control.name}: ${value.round()}',
-            overflow: TextOverflow.ellipsis, style: _controlNameStyle),
+        Text(
+            control.showName
+                ? '${control.name}: ${value.round()}'
+                : '${value.round()}',
+            overflow: TextOverflow.ellipsis,
+            style: _controlNameStyle),
         Slider(
           key: Key('run-control-${control.id}'),
           min: min,
@@ -468,8 +481,9 @@ class _RunToggle extends StatelessWidget {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Text(control.name,
-            overflow: TextOverflow.ellipsis, style: _controlNameStyle),
+        if (control.showName)
+          Text(control.name,
+              overflow: TextOverflow.ellipsis, style: _controlNameStyle),
         Switch(
           key: Key('run-control-${control.id}'),
           value: runner.toggleValue(control.id),
@@ -502,11 +516,11 @@ class _RunDisplay extends StatelessWidget {
           ),
           child: Center(
             child: Text(
-              value?.toString() ?? '--',
+              value ?? '--',
               key: Key('run-display-${control.id}'),
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                color: PinType.integer.color,
+                color: PinType.string.color,
                 fontSize: 24,
                 fontFamily: 'monospace',
                 fontWeight: FontWeight.bold,
@@ -514,9 +528,11 @@ class _RunDisplay extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(height: 4),
-        Text(control.name,
-            overflow: TextOverflow.ellipsis, style: _controlNameStyle),
+        if (control.showName) ...[
+          const SizedBox(height: 4),
+          Text(control.name,
+              overflow: TextOverflow.ellipsis, style: _controlNameStyle),
+        ],
       ],
     );
   }
@@ -554,9 +570,11 @@ class _RunLight extends StatelessWidget {
                 : null,
           ),
         ),
-        const SizedBox(height: 4),
-        Text(control.name,
-            overflow: TextOverflow.ellipsis, style: _controlNameStyle),
+        if (control.showName) ...[
+          const SizedBox(height: 4),
+          Text(control.name,
+              overflow: TextOverflow.ellipsis, style: _controlNameStyle),
+        ],
       ],
     );
   }

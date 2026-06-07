@@ -44,6 +44,9 @@ class ControllerControl {
   /// User-chosen size multiplier (see [ControllerLayout.setControlScale]).
   double get scale => (config['scale'] as num?)?.toDouble() ?? 1.0;
 
+  /// Whether the control's name is drawn on the Run screen.
+  bool get showName => config['showName'] != false;
+
   /// What this control *emits* — pins on the right of the controller node.
   List<PinSpec> get outputPins => switch (kind) {
         ControlKind.button => [
@@ -75,7 +78,7 @@ class ControllerControl {
             PinSpec('$id.on', '$name on?', PinType.boolean),
           ],
         ControlKind.display => [
-            PinSpec('$id.value', '$name value', PinType.integer),
+            PinSpec('$id.value', '$name value', PinType.string),
           ],
         _ => const [],
       };
@@ -307,6 +310,13 @@ class ControllerLayout extends ChangeNotifier {
     final target = control(id);
     if (target == null) return;
     target.config['scale'] = scale.clamp(0.5, 2.0);
+    notifyListeners();
+  }
+
+  void setControlShowName(String id, bool show) {
+    final target = control(id);
+    if (target == null) return;
+    target.config['showName'] = show;
     notifyListeners();
   }
 

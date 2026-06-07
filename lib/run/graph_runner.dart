@@ -97,14 +97,14 @@ class GraphRunner extends ChangeNotifier {
     return _toBool(_evalOutput(wire.from, {}), false);
   }
 
-  /// The number a display control should show: evaluates whatever is wired
+  /// The text a display control should show: evaluates whatever is wired
   /// into its `value` input right now, or null when nothing is wired.
-  int? displayValue(String controlId) {
+  /// Tolerant of pre-string saves that wired an int straight in.
+  String? displayValue(String controlId) {
     final wire = _wireInto(
         PinRef(kControllerNodeId, '$controlId.value', isOutput: false));
     if (wire == null) return null;
-    final value = _evalOutput(wire.from, {});
-    return value is int ? value : null;
+    return _evalOutput(wire.from, {})?.toString();
   }
 
   // ---- controller events ---------------------------------------------------
@@ -195,10 +195,18 @@ class GraphRunner extends ChangeNotifier {
           _toInt(_evalInput(node, pin, visiting), fallback);
       bool flag(String pin, bool fallback) =>
           _toBool(_evalInput(node, pin, visiting), fallback);
+      String str(String pin) {
+        final value = _evalInput(node, pin, visiting);
+        return value is String ? value : '';
+      }
 
       return switch (node.defId) {
         'value.int' => node.config['value'] as int? ?? 0,
         'value.bool' => node.config['value'] == true,
+        'text.string' => node.config['value'] as String? ?? '',
+        'text.pick' => flag('condition', false) ? str('a') : str('b'),
+        'text.fromInt' => '${input('number', 0)}',
+        'text.append' => str('a') + str('b'),
         'math.add' => input('a', 0) + input('b', 0),
         'math.subtract' => input('a', 0) - input('b', 0),
         'math.multiply' => input('a', 0) * input('b', 0),

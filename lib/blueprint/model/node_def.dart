@@ -11,6 +11,7 @@ enum NodeConfigKind {
   sensorPort, // which EV3 input port (1-4)
   intValue, // a number the user types
   boolValue, // a yes/no the user toggles
+  stringValue, // a piece of text the user types
 }
 
 /// A node type in the catalog: what it's called, how it's coloured, and the
@@ -51,6 +52,7 @@ class NodeDef {
         NodeConfigKind.sensorPort => {'port': '1'},
         NodeConfigKind.intValue => {'value': 0},
         NodeConfigKind.boolValue => {'value': false},
+        NodeConfigKind.stringValue => {'value': ''},
       };
 }
 
@@ -203,6 +205,42 @@ const List<NodeDef> nodeCatalog = [
     category: NodeCategory.value,
     configKind: NodeConfigKind.boolValue,
     outputs: [PinSpec('value', 'Value', PinType.boolean)],
+  ),
+  // Text
+  NodeDef(
+    id: 'text.string',
+    title: 'String',
+    category: NodeCategory.text,
+    configKind: NodeConfigKind.stringValue,
+    outputs: [PinSpec('value', 'Value', PinType.string)],
+  ),
+  NodeDef(
+    id: 'text.pick',
+    title: 'Pick String',
+    category: NodeCategory.text,
+    inputs: [
+      PinSpec('condition', 'Yes?', PinType.boolean),
+      PinSpec('a', 'If yes', PinType.string),
+      PinSpec('b', 'If no', PinType.string),
+    ],
+    outputs: [PinSpec('result', 'Picked', PinType.string)],
+  ),
+  NodeDef(
+    id: 'text.fromInt',
+    title: 'Int → String',
+    category: NodeCategory.text,
+    inputs: [PinSpec('number', 'Number', PinType.integer)],
+    outputs: [PinSpec('result', 'Text', PinType.string)],
+  ),
+  NodeDef(
+    id: 'text.append',
+    title: 'Append String',
+    category: NodeCategory.text,
+    inputs: [
+      PinSpec('a', 'A', PinType.string),
+      PinSpec('b', 'B', PinType.string),
+    ],
+    outputs: [PinSpec('result', 'A + B', PinType.string)],
   ),
 ];
 

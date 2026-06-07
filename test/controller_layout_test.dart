@@ -79,7 +79,7 @@ void main() {
     expect(def.inputs.single.type, PinType.boolean);
   });
 
-  test('a display is an int input on the controller node', () {
+  test('a display is a string input on the controller node', () {
     layout.addControl(
       tabId: layout.tabs.single.id,
       kind: ControlKind.display,
@@ -89,7 +89,22 @@ void main() {
     final def = layout.buildNodeDef();
     expect(def.outputs, isEmpty);
     expect(def.inputs.single.label, 'Speed value');
-    expect(def.inputs.single.type, PinType.integer);
+    expect(def.inputs.single.type, PinType.string);
+  });
+
+  test('showName defaults to true and persists when switched off', () {
+    final control = layout.addControl(
+      tabId: layout.tabs.single.id,
+      kind: ControlKind.button,
+      name: 'Go',
+      position: const Offset(0.5, 0.5),
+    );
+    expect(control.showName, isTrue);
+    layout.setControlShowName(control.id, false);
+    expect(control.showName, isFalse);
+
+    final copy = ControllerLayout.fromJson(layout.toJson());
+    expect(copy.control(control.id)!.showName, isFalse);
   });
 
   test('renaming a control changes labels but not pin ids', () {

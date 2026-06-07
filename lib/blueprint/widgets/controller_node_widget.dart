@@ -465,9 +465,9 @@ class _ControlVisual extends StatelessWidget {
                   border: Border.all(color: Colors.white24),
                 ),
                 child: Center(
-                  child: Text('0',
+                  child: Text('Abc',
                       style: TextStyle(
-                        color: PinType.integer.color,
+                        color: PinType.string.color,
                         fontSize: 13,
                         fontFamily: 'monospace',
                         fontWeight: FontWeight.bold,

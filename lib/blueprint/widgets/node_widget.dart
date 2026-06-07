@@ -186,6 +186,7 @@ class NodeWidget extends StatelessWidget {
         _buildPortPicker(def),
       NodeConfigKind.intValue => _buildIntValue(context),
       NodeConfigKind.boolValue => _buildBoolValue(),
+      NodeConfigKind.stringValue => _buildStringValue(context),
       NodeConfigKind.none => const SizedBox.shrink(),
     };
     return SizedBox(
@@ -265,6 +266,62 @@ class NodeWidget extends StatelessWidget {
             controller: controller,
             autofocus: true,
             keyboardType: const TextInputType.numberWithOptions(signed: true),
+            onSubmitted: (_) => submit(),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(onPressed: submit, child: const Text('Set')),
+          ],
+        );
+      },
+    );
+    if (result != null) onConfigChanged('value', result);
+  }
+
+  Widget _buildStringValue(BuildContext context) {
+    final value = node.config['value'] as String? ?? '';
+    return Row(
+      children: [
+        const Text('Text', style: _pinLabelStyle),
+        const SizedBox(width: 8),
+        Expanded(
+          child: GestureDetector(
+            key: Key('node-value-${node.id}'),
+            onTap: () => _editStringValue(context, value),
+            child: Text(
+              value.isEmpty ? 'tap to type…' : '"$value"',
+              textAlign: TextAlign.right,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: value.isEmpty
+                    ? Colors.white38
+                    : PinType.string.color,
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _editStringValue(BuildContext context, String current) async {
+    final controller = TextEditingController(text: current);
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        void submit() => Navigator.pop(context, controller.text);
+
+        return AlertDialog(
+          title: const Text('Set text'),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            maxLength: 60,
             onSubmitted: (_) => submit(),
           ),
           actions: [

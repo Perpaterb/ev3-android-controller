@@ -6,7 +6,8 @@ import 'package:flutter/material.dart';
 enum PinType {
   power(Color(0xFFFFFFFF)),
   integer(Color(0xFF4CAF50)),
-  boolean(Color(0xFFE53935));
+  boolean(Color(0xFFE53935)),
+  string(Color(0xFFE040FB));
 
   const PinType(this.color);
 
@@ -21,6 +22,7 @@ enum NodeCategory {
   logic('Logic', Color(0xFF5A6472)),
   flow('Flow', Color(0xFF707C8C)),
   value('Values', Color(0xFF2F8F83)),
+  text('Text', Color(0xFF9C4DCC)),
   controller('Controller', Color(0xFF7E57C2));
 
   const NodeCategory(this.label, this.color);

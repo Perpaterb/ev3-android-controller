@@ -119,8 +119,14 @@ void main() {
     final readout = addControl(ControlKind.display, 'Readout',
         position: const Offset(0.5, 0.7));
     seed(wireUp: (graph) {
+      final convert =
+          graph.addNode(nodeDefById('text.fromInt')!, Offset.zero);
       graph.connect(
         PinRef(kControllerNodeId, '${speed.id}.value', isOutput: true),
+        PinRef(convert.id, 'number', isOutput: false),
+      );
+      graph.connect(
+        PinRef(convert.id, 'result', isOutput: true),
         PinRef(kControllerNodeId, '${readout.id}.value', isOutput: false),
       );
     });
@@ -182,6 +188,37 @@ void main() {
     expect(find.text('Go'), findsOneWidget);
     expect(stage.height, greaterThan(stage.width));
     expect(stage.width / stage.height, closeTo(9 / 16, 0.01));
+  });
+
+  testWidgets('a display on top of a button never blocks the press',
+      (tester) async {
+    final go = addControl(ControlKind.button, 'Go');
+    // Same spot, added later → rendered on top of the button.
+    addControl(ControlKind.display, 'Readout');
+    seed(wireUp: (graph) {
+      final motor = graph.addNode(nodeDefById('motor.run')!, Offset.zero);
+      graph.connect(
+        PinRef(kControllerNodeId, '${go.id}.pressed', isOutput: true),
+        PinRef(motor.id, 'run', isOutput: false),
+      );
+    });
+    await pumpRunMode(tester);
+
+    final gesture = await tester.press(
+        find.byKey(Key('run-control-${go.id}')), warnIfMissed: false);
+    await tester.pump();
+    await gesture.up();
+    expect(brick.log, isNotEmpty); // the press reached the button
+  });
+
+  testWidgets('a control can hide its name in Run mode', (tester) async {
+    final go = addControl(ControlKind.button, 'Go');
+    layout.setControlShowName(go.id, false);
+    seed();
+    await pumpRunMode(tester);
+
+    expect(find.byKey(Key('run-control-${go.id}')), findsOneWidget);
+    expect(find.text('Go'), findsNothing);
   });
 
   testWidgets('tabs switch between control pages', (tester) async {

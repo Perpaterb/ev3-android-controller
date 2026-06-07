@@ -201,31 +201,65 @@ void main() {
     expect(r.lightOn(bump.id), isTrue);
   });
 
-  test('a display shows the slider wired into it', () {
+  test('a display shows the slider wired in through Int → String', () {
     final speed = addControl(ControlKind.slider, 'Speed');
     final readout = addControl(ControlKind.display, 'Readout');
     syncController();
-    wire(kControllerNodeId, '${speed.id}.value', kControllerNodeId,
-        '${readout.id}.value');
+    final convert = node('text.fromInt');
+    wire(kControllerNodeId, '${speed.id}.value', convert.id, 'number');
+    wire(convert.id, 'result', kControllerNodeId, '${readout.id}.value');
 
     final r = runner();
-    expect(r.displayValue(readout.id), 0); // slider starts at its minimum
+    expect(r.displayValue(readout.id), '0'); // slider starts at its minimum
     r.sliderChanged(speed.id, 73);
-    expect(r.displayValue(readout.id), 73);
+    expect(r.displayValue(readout.id), '73');
   });
 
-  test('a display shows math over a sensor', () {
+  test('append builds a label around a sensor value', () {
     final readout = addControl(ControlKind.display, 'Distance');
     syncController();
     final sensor = node('sensor.distance', {'port': '3'});
-    final add = node('math.add');
-    final offset = node('value.int', {'value': 5});
-    wire(sensor.id, 'distance', add.id, 'a');
-    wire(offset.id, 'value', add.id, 'b');
-    wire(add.id, 'result', kControllerNodeId, '${readout.id}.value');
+    final convert = node('text.fromInt');
+    final prefix = node('text.string', {'value': 'Distance: '});
+    final append = node('text.append');
+    wire(sensor.id, 'distance', convert.id, 'number');
+    wire(prefix.id, 'value', append.id, 'a');
+    wire(convert.id, 'result', append.id, 'b');
+    wire(append.id, 'result', kControllerNodeId, '${readout.id}.value');
 
     brick.distanceValues[3] = 40;
-    expect(runner().displayValue(readout.id), 45);
+    expect(runner().displayValue(readout.id), 'Distance: 40');
+  });
+
+  test('pick string chooses by a boolean', () {
+    final fast = addControl(ControlKind.toggle, 'Fast');
+    final readout = addControl(ControlKind.display, 'Mode');
+    syncController();
+    final pick = node('text.pick');
+    final yes = node('text.string', {'value': 'Turbo!'});
+    final no = node('text.string', {'value': 'Slow'});
+    wire(kControllerNodeId, '${fast.id}.state', pick.id, 'condition');
+    wire(yes.id, 'value', pick.id, 'a');
+    wire(no.id, 'value', pick.id, 'b');
+    wire(pick.id, 'result', kControllerNodeId, '${readout.id}.value');
+
+    final r = runner();
+    expect(r.displayValue(readout.id), 'Slow');
+    r.toggleChanged(fast.id, true);
+    expect(r.displayValue(readout.id), 'Turbo!');
+  });
+
+  test('a display cannot take an int wire directly', () {
+    final readout = addControl(ControlKind.display, 'Readout');
+    syncController();
+    final number = node('value.int', {'value': 9});
+    expect(
+      graph.canConnect(
+        PinRef(number.id, 'value', isOutput: true),
+        PinRef(kControllerNodeId, '${readout.id}.value', isOutput: false),
+      ),
+      isFalse,
+    );
   });
 
   test('an unwired display has no value', () {
