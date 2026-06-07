@@ -334,17 +334,27 @@ class _RunButton extends StatefulWidget {
 }
 
 class _RunButtonState extends State<_RunButton> {
-  bool _pressed = false;
+  // Counted, not boolean: a second finger on the same button must not
+  // re-fire pressed, and released only fires when the last finger lifts.
+  int _pointers = 0;
+
+  bool get _pressed => _pointers > 0;
 
   void _down() {
-    setState(() => _pressed = true);
-    widget.runner.buttonPressed(widget.control.id);
+    _pointers++;
+    if (_pointers == 1) {
+      setState(() {});
+      widget.runner.buttonPressed(widget.control.id);
+    }
   }
 
   void _up() {
-    if (!_pressed) return;
-    setState(() => _pressed = false);
-    widget.runner.buttonReleased(widget.control.id);
+    if (_pointers == 0) return;
+    _pointers--;
+    if (_pointers == 0) {
+      setState(() {});
+      widget.runner.buttonReleased(widget.control.id);
+    }
   }
 
   @override
@@ -390,7 +400,7 @@ class _RunDpad extends StatelessWidget {
     return _HoldArea(
       key: Key('run-dpad-${control.id}-$direction'),
       onDown: () => runner.dpadPressed(control.id, direction),
-      onUp: () => runner.dpadReleased(control.id),
+      onUp: () => runner.dpadReleased(control.id, direction),
       child: Container(
         width: 48,
         height: 48,
@@ -434,8 +444,9 @@ class _RunDpad extends StatelessWidget {
   }
 }
 
-/// Fires onDown when touched and onUp when the pointer lifts or leaves.
-class _HoldArea extends StatelessWidget {
+/// Fires onDown when the first pointer touches and onUp when the last one
+/// lifts — extra fingers on the same area don't re-fire.
+class _HoldArea extends StatefulWidget {
   const _HoldArea(
       {super.key,
       required this.onDown,
@@ -447,12 +458,25 @@ class _HoldArea extends StatelessWidget {
   final Widget child;
 
   @override
+  State<_HoldArea> createState() => _HoldAreaState();
+}
+
+class _HoldAreaState extends State<_HoldArea> {
+  int _pointers = 0;
+
+  @override
   Widget build(BuildContext context) {
     return Listener(
-      onPointerDown: (_) => onDown(),
-      onPointerUp: (_) => onUp(),
-      onPointerCancel: (_) => onUp(),
-      child: child,
+      onPointerDown: (_) {
+        if (++_pointers == 1) widget.onDown();
+      },
+      onPointerUp: (_) {
+        if (_pointers > 0 && --_pointers == 0) widget.onUp();
+      },
+      onPointerCancel: (_) {
+        if (_pointers > 0 && --_pointers == 0) widget.onUp();
+      },
+      child: widget.child,
     );
   }
 }

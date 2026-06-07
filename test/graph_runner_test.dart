@@ -164,9 +164,48 @@ void main() {
 
     final r = runner();
     r.dpadPressed(drive.id, 'up');
-    r.dpadReleased(drive.id);
+    r.dpadReleased(drive.id, 'up');
     expect(brick.log,
         ['Motor A: run at 100% forward', 'Motor A: stop']);
+  });
+
+  test('d-pad released fires only when the last direction lifts', () {
+    final drive = addControl(ControlKind.dpad, 'Drive');
+    syncController();
+    final up = node('motor.run', {'port': 'A'});
+    final stop = node('motor.stop', {'port': 'A'});
+    wire(kControllerNodeId, '${drive.id}.up', up.id, 'run');
+    wire(kControllerNodeId, '${drive.id}.released', stop.id, 'stop');
+
+    final r = runner();
+    r.dpadPressed(drive.id, 'up');
+    r.dpadPressed(drive.id, 'right'); // diagonal: two directions held
+    r.dpadReleased(drive.id, 'right'); // up still held — no stop yet
+    expect(brick.log, ['Motor A: run at 100% forward']);
+    r.dpadReleased(drive.id, 'up'); // last finger up
+    expect(brick.log.last, 'Motor A: stop');
+  });
+
+  test('two buttons can be held at the same time', () {
+    final left = addControl(ControlKind.button, 'Left');
+    final right = addControl(ControlKind.button, 'Right');
+    syncController();
+    final motorB = node('motor.run', {'port': 'B'});
+    final motorC = node('motor.run', {'port': 'C'});
+    final stopB = node('motor.stop', {'port': 'B'});
+    wire(kControllerNodeId, '${left.id}.pressed', motorB.id, 'run');
+    wire(kControllerNodeId, '${right.id}.pressed', motorC.id, 'run');
+    wire(kControllerNodeId, '${left.id}.released', stopB.id, 'stop');
+
+    final r = runner();
+    r.buttonPressed(left.id);
+    r.buttonPressed(right.id); // both held now
+    expect(brick.log, [
+      'Motor B: run at 100% forward',
+      'Motor C: run at 100% forward',
+    ]);
+    r.buttonReleased(left.id); // releasing one doesn't affect the other
+    expect(brick.log.last, 'Motor B: stop');
   });
 
   test('a light reflects a sensor comparison live', () {
@@ -291,7 +330,7 @@ void main() {
     expect(r.displayValue(readout.id), '0');
     r.dpadPressed(drive.id, 'up');
     expect(r.displayValue(readout.id), '1');
-    r.dpadReleased(drive.id);
+    r.dpadReleased(drive.id, 'up');
     expect(r.displayValue(readout.id), '0');
   });
 

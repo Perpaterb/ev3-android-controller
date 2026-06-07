@@ -140,9 +140,15 @@ class GraphRunner extends ChangeNotifier {
     _fireControl('$controlId.$direction');
   }
 
-  void dpadReleased(String controlId) {
-    _held.removeWhere((h) => h.startsWith('$controlId.'));
-    _fireControl('$controlId.released');
+  /// Releasing one direction while another is still held only drops that
+  /// direction; the d-pad's `released` pin fires when the LAST finger lifts.
+  void dpadReleased(String controlId, String direction) {
+    _held.remove('$controlId.$direction');
+    if (_held.any((h) => h.startsWith('$controlId.'))) {
+      notifyListeners(); // held level changed for Power → String etc.
+    } else {
+      _fireControl('$controlId.released');
+    }
   }
 
   void sliderChanged(String controlId, int value) {
