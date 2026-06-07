@@ -154,13 +154,13 @@ void main() {
         ['Motor B: run at 100% forward', 'Motor D: stop']);
   });
 
-  test('d-pad directions fire their own pins', () {
+  test('each d-pad direction has its own pressed and released pins', () {
     final drive = addControl(ControlKind.dpad, 'Drive');
     syncController();
     final up = node('motor.run', {'port': 'A'});
     final stop = node('motor.stop', {'port': 'A'});
     wire(kControllerNodeId, '${drive.id}.up', up.id, 'run');
-    wire(kControllerNodeId, '${drive.id}.released', stop.id, 'stop');
+    wire(kControllerNodeId, '${drive.id}.upReleased', stop.id, 'stop');
 
     final r = runner();
     r.dpadPressed(drive.id, 'up');
@@ -169,21 +169,32 @@ void main() {
         ['Motor A: run at 100% forward', 'Motor A: stop']);
   });
 
-  test('d-pad released fires only when the last direction lifts', () {
+  test('steering: tapping left never disturbs the held forward direction',
+      () {
     final drive = addControl(ControlKind.dpad, 'Drive');
     syncController();
-    final up = node('motor.run', {'port': 'A'});
-    final stop = node('motor.stop', {'port': 'A'});
-    wire(kControllerNodeId, '${drive.id}.up', up.id, 'run');
-    wire(kControllerNodeId, '${drive.id}.released', stop.id, 'stop');
+    // up drives motor B; left/leftReleased steer motor C.
+    final forward = node('motor.run', {'port': 'B'});
+    final steer = node('motor.run', {'port': 'C'});
+    final straighten = node('motor.stop', {'port': 'C'});
+    final stopForward = node('motor.stop', {'port': 'B'});
+    wire(kControllerNodeId, '${drive.id}.up', forward.id, 'run');
+    wire(kControllerNodeId, '${drive.id}.upReleased', stopForward.id, 'stop');
+    wire(kControllerNodeId, '${drive.id}.left', steer.id, 'run');
+    wire(kControllerNodeId, '${drive.id}.leftReleased',
+        straighten.id, 'stop');
 
     final r = runner();
-    r.dpadPressed(drive.id, 'up');
-    r.dpadPressed(drive.id, 'right'); // diagonal: two directions held
-    r.dpadReleased(drive.id, 'right'); // up still held — no stop yet
-    expect(brick.log, ['Motor A: run at 100% forward']);
-    r.dpadReleased(drive.id, 'up'); // last finger up
-    expect(brick.log.last, 'Motor A: stop');
+    r.dpadPressed(drive.id, 'up'); // drive forward…
+    r.dpadPressed(drive.id, 'left'); // …steer…
+    r.dpadReleased(drive.id, 'left'); // …straighten, still driving
+    expect(brick.log, [
+      'Motor B: run at 100% forward',
+      'Motor C: run at 100% forward',
+      'Motor C: stop',
+    ]);
+    r.dpadReleased(drive.id, 'up');
+    expect(brick.log.last, 'Motor B: stop');
   });
 
   test('two buttons can be held at the same time', () {

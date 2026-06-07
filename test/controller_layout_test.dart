@@ -56,14 +56,19 @@ void main() {
         def.outputs.map((p) => p.type), [PinType.boolean, PinType.power]);
   });
 
-  test('a d-pad contributes four directions plus released', () {
+  test('a d-pad contributes pressed and released per direction', () {
     layout.addControl(
       tabId: layout.tabs.single.id,
       kind: ControlKind.dpad,
       name: 'Drive',
       position: const Offset(0.5, 0.5),
     );
-    expect(layout.buildNodeDef().outputs, hasLength(5));
+    final outputs = layout.buildNodeDef().outputs;
+    expect(outputs, hasLength(8));
+    expect(
+      outputs.map((p) => p.label),
+      containsAll(['Drive left', 'Drive left released']),
+    );
   });
 
   test('a light is an input on the controller node', () {

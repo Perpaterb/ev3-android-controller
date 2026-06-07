@@ -140,15 +140,11 @@ class GraphRunner extends ChangeNotifier {
     _fireControl('$controlId.$direction');
   }
 
-  /// Releasing one direction while another is still held only drops that
-  /// direction; the d-pad's `released` pin fires when the LAST finger lifts.
+  /// Each direction is independent: releasing "left" fires only left's
+  /// released pin and never disturbs a direction still being held.
   void dpadReleased(String controlId, String direction) {
     _held.remove('$controlId.$direction');
-    if (_held.any((h) => h.startsWith('$controlId.'))) {
-      notifyListeners(); // held level changed for Power → String etc.
-    } else {
-      _fireControl('$controlId.released');
-    }
+    _fireControl('$controlId.${direction}Released');
   }
 
   void sliderChanged(String controlId, int value) {
@@ -287,10 +283,13 @@ class GraphRunner extends ChangeNotifier {
             return _held.contains(controlId) ? '1' : '0';
           case 'up' || 'down' || 'left' || 'right':
             return _held.contains('$controlId.$capability') ? '1' : '0';
-          case 'released':
-            final held = _held.contains(controlId) ||
-                _held.any((h) => h.startsWith('$controlId.'));
-            return held ? '0' : '1';
+          case 'released': // a button's released pin: inverse of held
+            return _held.contains(controlId) ? '0' : '1';
+          case _ when capability.endsWith('Released'):
+            // A d-pad direction's released pin: inverse of that direction.
+            final direction =
+                capability.substring(0, capability.length - 'Released'.length);
+            return _held.contains('$controlId.$direction') ? '0' : '1';
         }
       }
     }

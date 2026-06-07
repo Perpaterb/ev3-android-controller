@@ -67,12 +67,14 @@ class ControllerControl {
             PinSpec('$id.pressed', '$name pressed', PinType.power),
             PinSpec('$id.released', '$name released', PinType.power),
           ],
+        // Each direction is an independent button with its own pressed and
+        // released — hold "up" to drive while tapping left/right to steer.
         ControlKind.dpad => [
-            PinSpec('$id.up', '$name up', PinType.power),
-            PinSpec('$id.down', '$name down', PinType.power),
-            PinSpec('$id.left', '$name left', PinType.power),
-            PinSpec('$id.right', '$name right', PinType.power),
-            PinSpec('$id.released', '$name released', PinType.power),
+            for (final direction in const ['up', 'down', 'left', 'right']) ...[
+              PinSpec('$id.$direction', '$name $direction', PinType.power),
+              PinSpec('$id.${direction}Released',
+                  '$name $direction released', PinType.power),
+            ],
           ],
         ControlKind.slider => [
             PinSpec('$id.value', name, PinType.integer),
