@@ -285,7 +285,8 @@ class _ControllerNodeWidgetState extends State<ControllerNodeWidget> {
                       ),
                     ),
                   for (final control in tab.controls)
-                    _buildControl(control, stage),
+                    _buildControl(control, stage,
+                        stage.width / stageUnitsWidth(tab.landscape)),
                 ],
               ),
             ),
@@ -295,8 +296,10 @@ class _ControllerNodeWidgetState extends State<ControllerNodeWidget> {
     );
   }
 
-  Widget _buildControl(ControllerControl control, Size stage) {
-    final size = _controlSize(control.kind) * control.scale;
+  Widget _buildControl(ControllerControl control, Size stage, double factor) {
+    // Stage-unit size scaled to this stage's pixels — identical fraction of
+    // the stage as in Run mode.
+    final size = controlBaseSize(control.kind) * control.scale * factor;
     return Positioned(
       left: control.position.dx * stage.width - size.width / 2,
       top: control.position.dy * stage.height - size.height / 2,
@@ -325,14 +328,6 @@ class _ControllerNodeWidgetState extends State<ControllerNodeWidget> {
     );
   }
 
-  static Size _controlSize(ControlKind kind) => switch (kind) {
-        ControlKind.button => const Size(72, 34),
-        ControlKind.slider => const Size(100, 38),
-        ControlKind.toggle => const Size(64, 38),
-        ControlKind.dpad => const Size(64, 58),
-        ControlKind.light => const Size(48, 42),
-        ControlKind.display => const Size(76, 46),
-      };
 }
 
 /// Miniature, non-interactive rendering of a control for the designer.

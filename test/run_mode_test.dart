@@ -143,6 +143,19 @@ void main() {
     expect(find.text('--'), findsOneWidget);
   });
 
+  testWidgets('a control takes the same fraction of the stage as designed',
+      (tester) async {
+    final go = addControl(ControlKind.button, 'Go');
+    seed();
+    await pumpRunMode(tester);
+
+    final stage = tester.getSize(find.byKey(const Key('run-stage')));
+    final button = tester.getRect(find.byKey(Key('run-control-${go.id}')));
+    // Buttons are 120 units wide on the 800-unit landscape stage.
+    expect(button.width / stage.width, closeTo(120 / 800, 0.001));
+    expect(button.height / stage.height, closeTo(64 / 450, 0.001));
+  });
+
   testWidgets('a scaled-up control renders bigger on screen', (tester) async {
     final go = addControl(ControlKind.button, 'Go',
         position: const Offset(0.3, 0.5));

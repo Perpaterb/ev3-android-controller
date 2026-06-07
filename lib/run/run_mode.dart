@@ -134,7 +134,8 @@ class _RunModeState extends State<RunMode> with WidgetsBindingObserver {
                               ),
                             ),
                           for (final control in tab.controls)
-                            _buildControl(control, stage),
+                            _buildControl(control, stage,
+                                stage.width / stageUnitsWidth(tab.landscape)),
                         ],
                       ),
                     ),
@@ -264,9 +265,11 @@ class _RunModeState extends State<RunMode> with WidgetsBindingObserver {
 
   // ---- controls ------------------------------------------------------------
 
-  Widget _buildControl(ControllerControl control, Size stage) {
-    final base = _controlSize(control.kind);
-    final size = base * control.scale;
+  Widget _buildControl(ControllerControl control, Size stage, double factor) {
+    final base = controlBaseSize(control.kind);
+    // Stage-unit size scaled to this stage's pixels — identical fraction of
+    // the stage as in the designer miniature.
+    final size = base * control.scale * factor;
     final child = switch (control.kind) {
       ControlKind.button => _RunButton(control: control, runner: _runner),
       ControlKind.dpad => _RunDpad(control: control, runner: _runner),
@@ -290,14 +293,6 @@ class _RunModeState extends State<RunMode> with WidgetsBindingObserver {
     );
   }
 
-  static Size _controlSize(ControlKind kind) => switch (kind) {
-        ControlKind.button => const Size(120, 64),
-        ControlKind.slider => const Size(240, 76),
-        ControlKind.toggle => const Size(110, 72),
-        ControlKind.dpad => const Size(168, 168),
-        ControlKind.light => const Size(80, 76),
-        ControlKind.display => const Size(130, 80),
-      };
 }
 
 const TextStyle _controlNameStyle =

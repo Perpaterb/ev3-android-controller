@@ -30,3 +30,6 @@ migrate_working_dir/
 
 # Local AI tooling
 .claude/
+
+# Local troubleshooting screenshots
+TSImages/

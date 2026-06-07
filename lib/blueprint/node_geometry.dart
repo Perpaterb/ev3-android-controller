@@ -40,11 +40,13 @@ Offset pinOffset(NodeDef def, String pinId, {required bool isOutput}) {
 }
 
 /// Controller node metrics: pin label columns flank a central layout area
-/// showing the controller's controls.
-const double kControllerNodeWidth = 460;
+/// showing the controller's controls. Sized so a landscape stage renders at
+/// roughly 1:1 with its virtual 800x450 units — the designer miniature is
+/// then near-actual-size.
+const double kControllerNodeWidth = 1020;
 const double kControllerPinColumnWidth = 110;
 const double kControllerTabRowHeight = 36;
-const double kControllerMinContentHeight = 220;
+const double kControllerMinContentHeight = 458;
 const double kControllerPinRowHeight = 26;
 
 double controllerContentHeight(NodeDef def) => math.max(

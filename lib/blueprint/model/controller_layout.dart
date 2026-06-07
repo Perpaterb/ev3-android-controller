@@ -157,6 +157,26 @@ Size fitAspect(Size available, double aspect) {
   return Size(width, height);
 }
 
+/// The virtual stage is 800x450 units (450x800 in portrait). Control sizes
+/// are defined in these units and multiplied by `stage.width / unitsWidth`,
+/// so a control occupies the SAME fraction of the stage in the designer
+/// miniature and on the Run screen, whatever their pixel sizes.
+const double kStageUnitsLong = 800;
+const double kStageUnitsShort = 450;
+
+double stageUnitsWidth(bool landscape) =>
+    landscape ? kStageUnitsLong : kStageUnitsShort;
+
+/// Control footprint in stage units (before the per-control size slider).
+Size controlBaseSize(ControlKind kind) => switch (kind) {
+      ControlKind.button => const Size(120, 64),
+      ControlKind.slider => const Size(240, 76),
+      ControlKind.toggle => const Size(110, 72),
+      ControlKind.dpad => const Size(168, 168),
+      ControlKind.light => const Size(80, 76),
+      ControlKind.display => const Size(130, 80),
+    };
+
 /// The whole controller design: tabs of controls. Always has at least one
 /// tab. Lives in `project.controller` and is the source of truth for the
 /// controller node's pins ([buildNodeDef]) and the Run-mode UI.

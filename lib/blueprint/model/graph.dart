@@ -153,6 +153,10 @@ class BlueprintGraph extends ChangeNotifier {
 
   /// Inserts the project's controller node if it doesn't exist yet, and
   /// (re)applies its dynamic definition. Called once when the editor opens.
+  ///
+  /// The controller goes FIRST in iteration order so it paints underneath —
+  /// it's by far the biggest node, and smaller nodes dragged over it must
+  /// stay visible and tappable.
   GraphNode ensureControllerNode(NodeDef def, Offset position) {
     var node = _nodes[kControllerNodeId];
     if (node == null) {
@@ -162,7 +166,11 @@ class BlueprintGraph extends ChangeNotifier {
         label: 'Controller',
         position: position,
       );
-      _nodes[kControllerNodeId] = node;
+      final others = Map<String, GraphNode>.of(_nodes);
+      _nodes
+        ..clear()
+        ..[kControllerNodeId] = node
+        ..addAll(others);
     }
     node.dynamicDef = def;
     return node;
