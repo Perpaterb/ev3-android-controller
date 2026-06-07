@@ -20,7 +20,8 @@ enum NodeCategory {
   math('Math', Color(0xFF3F9E4D)),
   logic('Logic', Color(0xFF5A6472)),
   flow('Flow', Color(0xFF707C8C)),
-  value('Values', Color(0xFF2F8F83));
+  value('Values', Color(0xFF2F8F83)),
+  controller('Controller', Color(0xFF7E57C2));
 
   const NodeCategory(this.label, this.color);
 

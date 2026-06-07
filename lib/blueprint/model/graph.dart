@@ -5,6 +5,9 @@ import 'package:flutter/foundation.dart';
 import 'node_def.dart';
 import 'pins.dart';
 
+/// Node id of the one controller node every project has.
+const String kControllerNodeId = 'controller';
+
 /// One node placed on the blueprint canvas.
 class GraphNode {
   GraphNode({
@@ -27,7 +30,11 @@ class GraphNode {
   /// Per-node settings (EV3 port, constant value, …).
   final Map<String, dynamic> config;
 
-  NodeDef get def => nodeDefById(defId)!;
+  /// Set for nodes whose pins aren't fixed by the catalog — the controller
+  /// node, whose def is rebuilt whenever the controller layout changes.
+  NodeDef? dynamicDef;
+
+  NodeDef get def => dynamicDef ?? nodeDefById(defId)!;
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -138,8 +145,37 @@ class BlueprintGraph extends ChangeNotifier {
   }
 
   void removeNode(String id) {
+    if (id == kControllerNodeId) return; // the controller can't be deleted
     if (_nodes.remove(id) == null) return;
     _wires.removeWhere((w) => w.fromNode == id || w.toNode == id);
+    notifyListeners();
+  }
+
+  /// Inserts the project's controller node if it doesn't exist yet, and
+  /// (re)applies its dynamic definition. Called once when the editor opens.
+  GraphNode ensureControllerNode(NodeDef def, Offset position) {
+    var node = _nodes[kControllerNodeId];
+    if (node == null) {
+      node = GraphNode(
+        id: kControllerNodeId,
+        defId: kControllerDefId,
+        label: 'Controller',
+        position: position,
+      );
+      _nodes[kControllerNodeId] = node;
+    }
+    node.dynamicDef = def;
+    return node;
+  }
+
+  /// Swaps in a rebuilt dynamic definition (the controller layout changed)
+  /// and prunes any wires whose pins no longer exist.
+  void setDynamicDef(String nodeId, NodeDef def) {
+    final node = _nodes[nodeId];
+    if (node == null) return;
+    node.dynamicDef = def;
+    _wires.removeWhere(
+        (w) => pinType(w.from) == null || pinType(w.to) == null);
     notifyListeners();
   }
 
@@ -197,11 +233,20 @@ class BlueprintGraph extends ChangeNotifier {
   /// Reads the graph out of a project's `graph` map. Nodes whose definition
   /// no longer exists (an old save after a catalog change) are skipped, as
   /// are wires that lost an endpoint — a stale file must never crash the app.
-  factory BlueprintGraph.fromJson(Map<String, dynamic> json) {
+  ///
+  /// [dynamicDefs] supplies definitions that aren't in the catalog, keyed by
+  /// defId — the controller node's layout-derived def.
+  factory BlueprintGraph.fromJson(
+    Map<String, dynamic> json, {
+    Map<String, NodeDef> dynamicDefs = const {},
+  }) {
     final graph = BlueprintGraph();
     for (final raw in (json['nodes'] as List? ?? const [])) {
       final node = GraphNode.fromJson((raw as Map).cast<String, dynamic>());
-      if (nodeDefById(node.defId) == null) {
+      final dynamicDef = dynamicDefs[node.defId];
+      if (dynamicDef != null) {
+        node.dynamicDef = dynamicDef;
+      } else if (nodeDefById(node.defId) == null) {
         debugPrint('Skipping node with unknown def ${node.defId}');
         continue;
       }

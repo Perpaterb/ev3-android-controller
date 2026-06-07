@@ -33,9 +33,9 @@ class WirePainter extends CustomPainter {
       if (fromNode == null || toNode == null || type == null) continue;
 
       final start = viewport.toScreen(fromNode.position +
-          pinOffset(fromNode.def, wire.fromPin, isOutput: true));
+          nodePinOffset(fromNode, wire.fromPin, isOutput: true));
       final end = viewport.toScreen(toNode.position +
-          pinOffset(toNode.def, wire.toPin, isOutput: false));
+          nodePinOffset(toNode, wire.toPin, isOutput: false));
 
       // Horizontal tangents out of the output and into the input.
       final reach = ((end.dx - start.dx).abs() / 2)

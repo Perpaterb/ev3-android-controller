@@ -1,5 +1,9 @@
 import 'pins.dart';
 
+/// Definition id of the controller node. Its [NodeDef] is built dynamically
+/// from the [ControllerLayout] rather than living in the catalog.
+const String kControllerDefId = 'controller';
+
 /// Extra setting a node carries besides its pins.
 enum NodeConfigKind {
   none,

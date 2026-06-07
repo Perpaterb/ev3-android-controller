@@ -1,3 +1,4 @@
+import 'package:ev3_controller/blueprint/model/controller_layout.dart';
 import 'package:ev3_controller/blueprint/model/graph.dart';
 import 'package:ev3_controller/blueprint/model/node_def.dart';
 import 'package:ev3_controller/blueprint/model/pins.dart';
@@ -162,6 +163,92 @@ void main() {
     expect(copy.node(number.id)!.config['value'], 42);
     expect(copy.wires, hasLength(1));
     expect(copy.wires.single.toPin, 'speed');
+  });
+
+  group('controller node', () {
+    ControllerLayout layoutWithButton(String name) {
+      final layout = ControllerLayout();
+      layout.addControl(
+        tabId: layout.tabs.single.id,
+        kind: ControlKind.button,
+        name: name,
+        position: const Offset(0.5, 0.5),
+      );
+      return layout;
+    }
+
+    test('ensureControllerNode creates it once and keeps its position', () {
+      final layout = layoutWithButton('Go');
+      final node =
+          graph.ensureControllerNode(layout.buildNodeDef(), Offset.zero);
+      expect(node.id, kControllerNodeId);
+      graph.moveNode(node.id, const Offset(30, 0));
+
+      final again =
+          graph.ensureControllerNode(layout.buildNodeDef(), Offset.zero);
+      expect(identical(node, again), isTrue);
+      expect(again.position, const Offset(30, 0));
+    });
+
+    test('the controller node cannot be removed', () {
+      final layout = layoutWithButton('Go');
+      graph.ensureControllerNode(layout.buildNodeDef(), Offset.zero);
+      graph.removeNode(kControllerNodeId);
+      expect(graph.node(kControllerNodeId), isNotNull);
+    });
+
+    test('controller pins are wireable like any other pin', () {
+      final layout = layoutWithButton('Go');
+      final node =
+          graph.ensureControllerNode(layout.buildNodeDef(), Offset.zero);
+      final motor = graph.addNode(def('motor.run'), Offset.zero);
+      final pressed = layout.buildNodeDef().outputs.first.id;
+
+      expect(
+        graph.connect(
+          PinRef(node.id, pressed, isOutput: true),
+          PinRef(motor.id, 'run', isOutput: false),
+        ),
+        isTrue,
+      );
+    });
+
+    test('setDynamicDef prunes wires to pins that vanished', () {
+      final layout = layoutWithButton('Go');
+      final controlId = layout.tabs.single.controls.single.id;
+      final node =
+          graph.ensureControllerNode(layout.buildNodeDef(), Offset.zero);
+      final motor = graph.addNode(def('motor.run'), Offset.zero);
+      graph.connect(
+        PinRef(node.id, '$controlId.pressed', isOutput: true),
+        PinRef(motor.id, 'run', isOutput: false),
+      );
+      expect(graph.wires, hasLength(1));
+
+      layout.removeControl(controlId);
+      graph.setDynamicDef(kControllerNodeId, layout.buildNodeDef());
+      expect(graph.wires, isEmpty);
+    });
+
+    test('fromJson restores the controller node via dynamicDefs', () {
+      final layout = layoutWithButton('Go');
+      graph.ensureControllerNode(layout.buildNodeDef(), const Offset(1, 2));
+
+      final copy = BlueprintGraph.fromJson(
+        graph.toJson(),
+        dynamicDefs: {kControllerDefId: layout.buildNodeDef()},
+      );
+      final node = copy.node(kControllerNodeId)!;
+      expect(node.position, const Offset(1, 2));
+      expect(node.def.outputs, hasLength(2));
+    });
+
+    test('fromJson without the dynamic def skips the controller node', () {
+      final layout = layoutWithButton('Go');
+      graph.ensureControllerNode(layout.buildNodeDef(), Offset.zero);
+      final copy = BlueprintGraph.fromJson(graph.toJson());
+      expect(copy.node(kControllerNodeId), isNull);
+    });
   });
 
   test('fromJson skips unknown defs and orphaned wires', () {

@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'dart:ui';
 
+import 'model/graph.dart';
 import 'model/node_def.dart';
 
 /// Node layout metrics, fixed so pin positions are computable without
@@ -37,3 +38,46 @@ Offset pinOffset(NodeDef def, String pinId, {required bool isOutput}) {
     kNodeHeaderHeight + index * kPinRowHeight + kPinRowHeight / 2,
   );
 }
+
+/// Controller node metrics: pin label columns flank a central layout area
+/// showing the controller's controls.
+const double kControllerNodeWidth = 460;
+const double kControllerPinColumnWidth = 110;
+const double kControllerTabRowHeight = 36;
+const double kControllerMinContentHeight = 220;
+const double kControllerPinRowHeight = 26;
+
+double controllerContentHeight(NodeDef def) => math.max(
+      kControllerMinContentHeight,
+      math.max(def.inputs.length, def.outputs.length) *
+          kControllerPinRowHeight,
+    );
+
+Size controllerNodeSize(NodeDef def) => Size(
+      kControllerNodeWidth,
+      kNodeHeaderHeight +
+          kControllerTabRowHeight +
+          controllerContentHeight(def) +
+          kNodeBottomPadding,
+    );
+
+Offset controllerPinOffset(NodeDef def, String pinId,
+    {required bool isOutput}) {
+  final pins = isOutput ? def.outputs : def.inputs;
+  final index = pins.indexWhere((p) => p.id == pinId);
+  assert(index >= 0, 'Unknown controller pin $pinId');
+  return Offset(
+    isOutput ? kControllerNodeWidth - kPinInset : kPinInset,
+    kNodeHeaderHeight +
+        kControllerTabRowHeight +
+        index * kControllerPinRowHeight +
+        kControllerPinRowHeight / 2,
+  );
+}
+
+/// Pin offset for any node instance — dispatches to the controller layout
+/// for the controller node, the standard layout otherwise.
+Offset nodePinOffset(GraphNode node, String pinId, {required bool isOutput}) =>
+    node.id == kControllerNodeId
+        ? controllerPinOffset(node.def, pinId, isOutput: isOutput)
+        : pinOffset(node.def, pinId, isOutput: isOutput);

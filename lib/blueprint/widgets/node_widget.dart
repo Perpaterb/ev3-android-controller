@@ -5,6 +5,7 @@ import '../model/graph.dart';
 import '../model/node_def.dart';
 import '../model/pins.dart';
 import '../node_geometry.dart';
+import 'node_chrome.dart';
 
 /// One node on the canvas: category-coloured header (drag handle + label),
 /// pin rows (inputs left, outputs right), and an optional config row (EV3
@@ -118,13 +119,13 @@ class NodeWidget extends StatelessWidget {
               ),
             ),
             if (selected) ...[
-              _HeaderButton(
+              NodeHeaderButton(
                 key: Key('node-edit-${node.id}'),
                 icon: Icons.edit,
                 onTap: onRename,
               ),
               const SizedBox(width: 2),
-              _HeaderButton(
+              NodeHeaderButton(
                 key: Key('node-delete-${node.id}'),
                 icon: Icons.delete,
                 onTap: onDelete,
@@ -168,46 +169,13 @@ class NodeWidget extends StatelessWidget {
   Widget _buildPin(PinSpec spec, {required bool isOutput}) {
     final ref = PinRef(node.id, spec.id, isOutput: isOutput);
     final highlighted = pinHighlighted(ref);
-    final faded = wiringActive && !highlighted;
-    return GestureDetector(
+    return PinDot(
       key: Key('pin-${node.id}-${spec.id}-${isOutput ? 'out' : 'in'}'),
-      // Absorb the tap even when faded: a mis-tap on an incompatible pin
-      // shouldn't fall through and cancel wiring mode.
-      behavior: HitTestBehavior.opaque,
+      type: spec.type,
+      highlighted: highlighted,
+      faded: wiringActive && !highlighted,
       onTap: () => onTapPin(ref),
       onLongPress: () => onLongPressPin(ref),
-      child: SizedBox(
-        // Centre of the dot lands exactly kPinInset inside the node edge,
-        // matching pinOffset() in node_geometry.dart.
-        width: 2 * kPinInset,
-        height: kPinRowHeight,
-        child: Center(
-          child: Opacity(
-            opacity: faded ? 0.25 : 1,
-            child: Container(
-              width: 12,
-              height: 12,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: spec.type.color,
-                border: Border.all(
-                  color: highlighted ? Colors.white : Colors.black54,
-                  width: highlighted ? 2.5 : 1,
-                ),
-                boxShadow: highlighted
-                    ? [
-                        BoxShadow(
-                          color: spec.type.color.withValues(alpha: 0.8),
-                          blurRadius: 8,
-                          spreadRadius: 2,
-                        ),
-                      ]
-                    : null,
-              ),
-            ),
-          ),
-        ),
-      ),
     );
   }
 
@@ -329,21 +297,3 @@ class NodeWidget extends StatelessWidget {
   }
 }
 
-class _HeaderButton extends StatelessWidget {
-  const _HeaderButton({super.key, required this.icon, required this.onTap});
-
-  final IconData icon;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Padding(
-        padding: const EdgeInsets.all(4),
-        child: Icon(icon, size: 16, color: Colors.white),
-      ),
-    );
-  }
-}
