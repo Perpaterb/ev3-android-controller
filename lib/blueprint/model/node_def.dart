@@ -139,6 +139,26 @@ const List<NodeDef> nodeCatalog = [
     ],
     outputs: [PinSpec('result', 'A > B', PinType.boolean)],
   ),
+  NodeDef(
+    id: 'math.less',
+    title: 'Is Smaller?',
+    category: NodeCategory.math,
+    inputs: [
+      PinSpec('a', 'A', PinType.integer),
+      PinSpec('b', 'B', PinType.integer),
+    ],
+    outputs: [PinSpec('result', 'A < B', PinType.boolean)],
+  ),
+  NodeDef(
+    id: 'math.equals',
+    title: 'Is Equal?',
+    category: NodeCategory.math,
+    inputs: [
+      PinSpec('a', 'A', PinType.integer),
+      PinSpec('b', 'B', PinType.integer),
+    ],
+    outputs: [PinSpec('result', 'A = B', PinType.boolean)],
+  ),
   // Logic
   NodeDef(
     id: 'logic.and',

@@ -239,6 +239,29 @@ void main() {
     expect(r.lightOn(near.id), isTrue);
   });
 
+  test('comparison nodes: bigger, smaller, equal', () {
+    final lamp = addControl(ControlKind.light, 'Lamp');
+    syncController();
+
+    for (final (defId, a, b, expected) in [
+      ('math.greater', 5, 3, true),
+      ('math.greater', 3, 5, false),
+      ('math.less', 3, 5, true),
+      ('math.less', 5, 3, false),
+      ('math.equals', 4, 4, true),
+      ('math.equals', 4, 5, false),
+    ]) {
+      final compare = node(defId);
+      final left = node('value.int', {'value': a});
+      final right = node('value.int', {'value': b});
+      wire(left.id, 'value', compare.id, 'a');
+      wire(right.id, 'value', compare.id, 'b');
+      wire(compare.id, 'result', kControllerNodeId, '${lamp.id}.on');
+      expect(runner().lightOn(lamp.id), expected,
+          reason: '$defId($a, $b) should be $expected');
+    }
+  });
+
   test('a touch sensor drives a light', () {
     final bump = addControl(ControlKind.light, 'Bump');
     syncController();

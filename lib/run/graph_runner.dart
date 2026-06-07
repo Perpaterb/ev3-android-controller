@@ -250,6 +250,8 @@ class GraphRunner extends ChangeNotifier {
         'math.subtract' => input('a', 0) - input('b', 0),
         'math.multiply' => input('a', 0) * input('b', 0),
         'math.greater' => input('a', 0) > input('b', 0),
+        'math.less' => input('a', 0) < input('b', 0),
+        'math.equals' => input('a', 0) == input('b', 0),
         'logic.and' => flag('a', false) && flag('b', false),
         'logic.or' => flag('a', false) || flag('b', false),
         'logic.not' => !flag('value', false),
