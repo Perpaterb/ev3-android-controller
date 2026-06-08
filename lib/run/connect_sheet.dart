@@ -1,6 +1,5 @@
 import 'dart:io' show SocketException;
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../services/brick_connection.dart';
