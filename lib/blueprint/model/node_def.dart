@@ -174,7 +174,7 @@ const List<NodeDef> nodeCatalog = [
   // Logic
   NodeDef(
     id: 'logic.and',
-    title: 'And',
+    title: 'Both? (AND)',
     category: NodeCategory.logic,
     inputs: [
       PinSpec('a', 'A', PinType.boolean),
@@ -184,7 +184,7 @@ const List<NodeDef> nodeCatalog = [
   ),
   NodeDef(
     id: 'logic.or',
-    title: 'Or',
+    title: 'Either? (OR)',
     category: NodeCategory.logic,
     inputs: [
       PinSpec('a', 'A', PinType.boolean),
@@ -194,14 +194,14 @@ const List<NodeDef> nodeCatalog = [
   ),
   NodeDef(
     id: 'logic.not',
-    title: 'Not',
+    title: 'Opposite (NOT)',
     category: NodeCategory.logic,
     inputs: [PinSpec('value', 'Value', PinType.boolean)],
     outputs: [PinSpec('result', 'Opposite', PinType.boolean)],
   ),
   NodeDef(
     id: 'logic.xor',
-    title: 'Different?',
+    title: 'Different? (XOR)',
     category: NodeCategory.logic,
     inputs: [
       PinSpec('a', 'A', PinType.boolean),
@@ -211,7 +211,7 @@ const List<NodeDef> nodeCatalog = [
   ),
   NodeDef(
     id: 'logic.same',
-    title: 'Same?',
+    title: 'Same? (XNOR)',
     category: NodeCategory.logic,
     inputs: [
       PinSpec('a', 'A', PinType.boolean),
