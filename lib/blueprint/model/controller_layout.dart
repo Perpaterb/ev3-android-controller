@@ -78,6 +78,9 @@ class ControllerControl {
   double get displayTextSize =>
       (config['textSize'] as num?)?.toDouble() ?? 24.0;
 
+  /// Whether a display draws its background box and border (off = just text).
+  bool get displayFramed => config['framed'] != false;
+
   /// Every pin this control could emit, before the user's declutter
   /// choices. Momentary controls expose three power pins: `touched` fires
   /// once on press, `released` once on release, and `held` (pin id `isDown`)
@@ -383,6 +386,13 @@ class ControllerLayout extends ChangeNotifier {
     final target = control(id);
     if (target == null) return;
     target.config['textSize'] = size.clamp(12.0, 40.0);
+    notifyListeners();
+  }
+
+  void setDisplayFramed(String id, bool framed) {
+    final target = control(id);
+    if (target == null) return;
+    target.config['framed'] = framed;
     notifyListeners();
   }
 

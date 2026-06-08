@@ -576,11 +576,13 @@ class _RunDisplay extends StatelessWidget {
         Expanded(
           child: Container(
             width: double.infinity,
-            decoration: BoxDecoration(
-              color: Colors.black54,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Colors.white24, width: 2),
-            ),
+            decoration: control.displayFramed
+                ? BoxDecoration(
+                    color: Colors.black54,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.white24, width: 2),
+                  )
+                : null,
             child: Center(
               child: Text(
                 value ?? '--',

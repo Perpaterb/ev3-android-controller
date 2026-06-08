@@ -451,7 +451,7 @@ class _BlueprintEditorState extends State<BlueprintEditor> {
                   setSheetState(() {});
                 },
               ),
-              if (control.kind == ControlKind.display)
+              if (control.kind == ControlKind.display) ...[
                 _sheetSlider(
                   key: const Key('control-text-size'),
                   icon: Icons.text_fields,
@@ -466,6 +466,17 @@ class _BlueprintEditorState extends State<BlueprintEditor> {
                     setSheetState(() {});
                   },
                 ),
+                SwitchListTile(
+                  key: const Key('control-display-framed'),
+                  secondary: const Icon(Icons.crop_square),
+                  title: const Text('Show background box'),
+                  value: control.displayFramed,
+                  onChanged: (value) {
+                    _layout.setDisplayFramed(control.id, value);
+                    setSheetState(() {});
+                  },
+                ),
+              ],
               if (control.kind == ControlKind.slider)
                 _sheetSlider(
                   key: const Key('control-slider-default'),

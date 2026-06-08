@@ -298,8 +298,12 @@ void main() {
     expect(control.displayTextSize, 40.0);
     layout.setDisplayTextSize(control.id, 32);
 
+    expect(control.displayFramed, isTrue); // boxed by default
+    layout.setDisplayFramed(control.id, false);
+
     final copy = ControllerLayout.fromJson(layout.toJson());
     expect(copy.control(control.id)!.displayTextSize, 32.0);
+    expect(copy.control(control.id)!.displayFramed, isFalse);
   });
 
   test('fitAspect letterboxes to the limiting dimension', () {
