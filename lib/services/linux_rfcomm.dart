@@ -164,7 +164,11 @@ class LinuxRfcommTransport implements Ev3Transport {
     view.setInt32(0, fd, Endian.host); // pollfd.fd
     view.setInt16(4, _pollout, Endian.host); // pollfd.events
     try {
-      final ready = _poll(pollfd, 1, _connectTimeoutMs);
+      // poll() is itself interruptible by VM signals (EINTR) — keep waiting.
+      int ready;
+      do {
+        ready = _poll(pollfd, 1, _connectTimeoutMs);
+      } while (ready < 0 && _errno == _eintr);
       if (ready == 0) return _etimedout;
       if (ready < 0) return _errno;
     } finally {
