@@ -10,6 +10,7 @@ import 'model/controller_layout.dart';
 import 'model/graph.dart';
 import 'model/node_def.dart';
 import 'model/pins.dart';
+import 'model/variables.dart';
 import 'node_geometry.dart';
 import 'widgets/add_control_sheet.dart';
 import 'widgets/add_node_sheet.dart';
@@ -41,6 +42,7 @@ class _BlueprintEditorState extends State<BlueprintEditor> {
 
   late final BlueprintGraph _graph;
   late final ControllerLayout _layout;
+  late final VariableSet _variables;
   String? _selectedNodeId;
 
   /// The pin a wire is being drawn from while wiring mode is active.
@@ -53,10 +55,12 @@ class _BlueprintEditorState extends State<BlueprintEditor> {
   void initState() {
     super.initState();
     _layout = ControllerLayout.fromJson(widget.project.controller);
+    _variables = VariableSet.fromJson(widget.project.variables);
     final controllerDef = _layout.buildNodeDef();
     _graph = BlueprintGraph.fromJson(
       widget.project.graph,
       dynamicDefs: {kControllerDefId: controllerDef},
+      variables: _variables,
     );
     // Every project has its controller front and centre on the canvas.
     _graph.ensureControllerNode(
@@ -66,6 +70,7 @@ class _BlueprintEditorState extends State<BlueprintEditor> {
     );
     _graph.addListener(_onGraphChanged);
     _layout.addListener(_onLayoutChanged);
+    _variables.addListener(_onVariablesChanged);
   }
 
   @override
@@ -85,6 +90,7 @@ class _BlueprintEditorState extends State<BlueprintEditor> {
     if (_dirty) _persist();
     _graph.removeListener(_onGraphChanged);
     _layout.removeListener(_onLayoutChanged);
+    _variables.removeListener(_onVariablesChanged);
     super.dispose();
   }
 
@@ -102,6 +108,14 @@ class _BlueprintEditorState extends State<BlueprintEditor> {
     _graph.setDynamicDef(kControllerNodeId, _layout.buildNodeDef());
   }
 
+  void _onVariablesChanged() {
+    // A renamed variable relabels its Get/Set nodes; a deleted one removes
+    // them and their wires.
+    _graph.applyVariableDefs(_variables);
+    setState(() {});
+    _markDirty();
+  }
+
   void _markDirty() {
     _dirty = true;
     _saveTimer?.cancel();
@@ -114,6 +128,9 @@ class _BlueprintEditorState extends State<BlueprintEditor> {
     widget.project.controller
       ..clear()
       ..addAll(_layout.toJson());
+    widget.project.variables
+      ..clear()
+      ..addAll(_variables.toJson());
     widget.store.save(widget.project);
   }
 
@@ -259,16 +276,31 @@ class _BlueprintEditorState extends State<BlueprintEditor> {
     final defs = from == null
         ? null
         : nodeCatalog.where((d) => _defConnectsTo(d, from)).toList();
-    final def = await showAddNodeSheet(
+    final choice = await showAddNodeSheet(
       context,
       defs: defs,
+      variables: _variables,
       hint: from == null
           ? null
           : 'Showing nodes that can connect to your wire — '
               'it will hook up automatically.',
     );
-    if (def == null) return;
-    final node = _graph.addNode(def, canvasPosition);
+    if (choice == null || !mounted) return;
+
+    final GraphNode node;
+    switch (choice) {
+      case CatalogChoice(:final def):
+        node = _graph.addNode(def, canvasPosition);
+      case VariableChoice(:final variableId, :final isSetter):
+        final added = _addVarNode(variableId, isSetter, canvasPosition);
+        if (added == null) return;
+        node = added;
+      case NewVariableChoice():
+        final created = await _createVariable();
+        if (created == null || !mounted) return;
+        node = _addVarNode(created, false, canvasPosition)!;
+    }
+
     if (from != null) {
       final target = _firstCompatiblePin(node, from);
       if (target != null) _graph.connect(from, target);
@@ -277,6 +309,49 @@ class _BlueprintEditorState extends State<BlueprintEditor> {
       _selectedNodeId = node.id;
       _wiringFrom = null;
     });
+  }
+
+  GraphNode? _addVarNode(String variableId, bool isSetter, Offset position) {
+    final variable = _variables.byId(variableId);
+    if (variable == null) return null;
+    final def = isSetter ? varSetDef(variable) : varGetDef(variable);
+    return _graph.addDynamicNode(def, position, {'var': variableId});
+  }
+
+  /// Prompts for a name and type, creates the variable, returns its id.
+  Future<String?> _createVariable() async {
+    final type = await showModalBottomSheet<VarType>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            ListTile(
+                title: Text('What kind of variable?',
+                    style: Theme.of(context).textTheme.titleMedium)),
+            for (final t in VarType.values)
+              ListTile(
+                key: Key('new-var-${t.name}'),
+                leading: Icon(switch (t) {
+                  VarType.integer => Icons.pin_outlined,
+                  VarType.boolean => Icons.toggle_on_outlined,
+                  VarType.text => Icons.text_fields,
+                }),
+                title: Text(t.label),
+                onTap: () => Navigator.pop(context, t),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (type == null || !mounted) return null;
+    final name = await _promptForText(
+      title: 'Name your variable',
+      initial: _variables.defaultName(type),
+      confirmLabel: 'Create',
+    );
+    if (name == null) return null;
+    return _variables.create(name, type).id;
   }
 
   bool _defConnectsTo(NodeDef def, PinRef from) {

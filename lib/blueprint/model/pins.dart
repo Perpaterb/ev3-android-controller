@@ -24,6 +24,7 @@ enum NodeCategory {
   value('Values', Color(0xFF2F8F83)),
   text('Text', Color(0xFF9C4DCC)),
   event('Events', Color(0xFFB23A48)),
+  variable('Variables', Color(0xFFC79A2E)),
   controller('Controller', Color(0xFF7E57C2));
 
   const NodeCategory(this.label, this.color);

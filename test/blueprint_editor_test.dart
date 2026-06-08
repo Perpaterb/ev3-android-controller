@@ -112,6 +112,40 @@ void main() {
     expect(wires.single['fromNode'], number['id']);
   });
 
+  testWidgets('make a new variable, then add its Get node', (tester) async {
+    await pumpEditor(tester);
+    await tester.longPressAt(const Offset(200, 1000));
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(
+        find.byKey(const Key('add-new-variable')), 200,
+        scrollable: find.byType(Scrollable).last);
+    await tester.tap(find.byKey(const Key('add-new-variable')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('new-var-integer')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'Score');
+    await tester.tap(find.text('Create'));
+    await tester.pumpAndSettle();
+
+    // A Get node for the new variable is placed.
+    expect(find.text('Get Score'), findsOneWidget);
+    final saved = await savedGraph(tester);
+    final getNode =
+        userNodes(saved).singleWhere((n) => n['def'] == 'var.get');
+    expect((getNode['config'] as Map)['var'], isNotNull);
+    // The variable itself is saved on the project.
+    expect((project.variables['variables'] as List).single['name'], 'Score');
+
+    // It now appears in the add-node menu for re-use (Get and Set).
+    await tester.longPressAt(const Offset(200, 1000));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+        find.byKey(Key('add-set-${getNode['config']['var']}')), 200,
+        scrollable: find.byType(Scrollable).last);
+    expect(find.text('Set Score'), findsOneWidget);
+  });
+
   testWidgets('dragging the header moves the node', (tester) async {
     final graph = seed();
     final node = graph.addNode(nodeDefById('math.add')!, const Offset(-700, -400));

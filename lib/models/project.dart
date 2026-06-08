@@ -12,8 +12,10 @@ class Project {
     required this.updatedAt,
     Map<String, dynamic>? graph,
     Map<String, dynamic>? controller,
+    Map<String, dynamic>? variables,
   })  : graph = graph ?? {},
-        controller = controller ?? {};
+        controller = controller ?? {},
+        variables = variables ?? {};
 
   static const int formatVersion = 1;
 
@@ -28,6 +30,9 @@ class Project {
   /// Controller layout (tabs, controls). Placeholder until the designer exists.
   Map<String, dynamic> controller;
 
+  /// Project variables (Get/Set node backing store definitions).
+  Map<String, dynamic> variables;
+
   factory Project.fromJson(Map<String, dynamic> json) {
     return Project(
       id: json['id'] as String,
@@ -36,6 +41,7 @@ class Project {
       updatedAt: DateTime.parse(json['updatedAt'] as String),
       graph: (json['graph'] as Map?)?.cast<String, dynamic>(),
       controller: (json['controller'] as Map?)?.cast<String, dynamic>(),
+      variables: (json['variables'] as Map?)?.cast<String, dynamic>(),
     );
   }
 
@@ -47,5 +53,6 @@ class Project {
         'updatedAt': updatedAt.toIso8601String(),
         'graph': graph,
         'controller': controller,
+        'variables': variables,
       };
 }

@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 
 import 'node_def.dart';
 import 'pins.dart';
+import 'variables.dart';
 
 /// Node id of the one controller node every project has.
 const String kControllerNodeId = 'controller';
@@ -124,6 +125,24 @@ class BlueprintGraph extends ChangeNotifier {
     return node;
   }
 
+  /// Adds a node whose pins come from a per-node [def] (Get/Set), with its
+  /// [config] (e.g. the variable id). The def is set before listeners fire,
+  /// so the node always renders with valid pins.
+  GraphNode addDynamicNode(
+      NodeDef def, Offset position, Map<String, dynamic> config) {
+    final node = GraphNode(
+      id: 'n${DateTime.now().microsecondsSinceEpoch.toRadixString(36)}'
+          '-${_seq++}',
+      defId: def.id,
+      label: def.title,
+      position: position,
+      config: config,
+    )..dynamicDef = def;
+    _nodes[node.id] = node;
+    notifyListeners();
+    return node;
+  }
+
   void moveNode(String id, Offset delta) {
     final node = _nodes[id];
     if (node == null) return;
@@ -187,6 +206,30 @@ class BlueprintGraph extends ChangeNotifier {
     _wires.removeWhere(
         (w) => pinType(w.from) == null || pinType(w.to) == null);
     notifyListeners();
+  }
+
+  /// (Re)builds the dynamic def of every Get/Set node from [variables], drops
+  /// nodes whose variable was deleted, and prunes orphaned wires. Call when
+  /// the variable set changes or after loading.
+  void applyVariableDefs(VariableSet variables) {
+    var changed = false;
+    for (final node in _nodes.values.toList()) {
+      if (node.defId != kVarGetDefId && node.defId != kVarSetDefId) continue;
+      final variable = variables.byId(node.config['var'] as String? ?? '');
+      if (variable == null) {
+        _nodes.remove(node.id);
+        _wires.removeWhere((w) => w.fromNode == node.id || w.toNode == node.id);
+        changed = true;
+        continue;
+      }
+      node.dynamicDef = node.defId == kVarGetDefId
+          ? varGetDef(variable)
+          : varSetDef(variable);
+    }
+    final wiresBefore = _wires.length;
+    _wires.removeWhere(
+        (w) => pinType(w.from) == null || pinType(w.to) == null);
+    if (changed || _wires.length != wiresBefore) notifyListeners();
   }
 
   PinType? pinType(PinRef ref) =>
@@ -273,30 +316,38 @@ class BlueprintGraph extends ChangeNotifier {
   /// are wires that lost an endpoint — a stale file must never crash the app.
   ///
   /// [dynamicDefs] supplies definitions that aren't in the catalog, keyed by
-  /// defId — the controller node's layout-derived def.
+  /// defId — the controller node's layout-derived def. [variables] resolves
+  /// the per-node defs of Get/Set nodes.
   factory BlueprintGraph.fromJson(
     Map<String, dynamic> json, {
     Map<String, NodeDef> dynamicDefs = const {},
+    VariableSet? variables,
   }) {
     final graph = BlueprintGraph();
     for (final raw in (json['nodes'] as List? ?? const [])) {
       final node = GraphNode.fromJson((raw as Map).cast<String, dynamic>());
       final dynamicDef = dynamicDefs[node.defId];
+      final isVarNode = variables != null &&
+          (node.defId == kVarGetDefId || node.defId == kVarSetDefId);
       if (dynamicDef != null) {
         node.dynamicDef = dynamicDef;
+      } else if (isVarNode) {
+        // def assigned below by applyVariableDefs
       } else if (nodeDefById(node.defId) == null) {
         debugPrint('Skipping node with unknown def ${node.defId}');
         continue;
       }
       graph._nodes[node.id] = node;
     }
-    // Load all wires first and grow sequence nodes to cover them — a wire
-    // into a grown `then3` is only valid once the def has grown — then drop
-    // any wire that still has a missing endpoint.
+    // Load all wires, then grow sequence nodes and resolve variable defs so
+    // their grown / dynamic pins exist — a wire into a grown `then3` or a
+    // Get/Set pin is only valid once its def is in place — then drop any
+    // wire that still has a missing endpoint.
     for (final raw in (json['wires'] as List? ?? const [])) {
       graph._wires.add(Wire.fromJson((raw as Map).cast<String, dynamic>()));
     }
     graph._refreshSequenceNodes();
+    if (variables != null) graph.applyVariableDefs(variables);
     graph._wires.removeWhere((w) =>
         graph.pinType(w.from) == null || graph.pinType(w.to) == null);
     graph._refreshSequenceNodes();

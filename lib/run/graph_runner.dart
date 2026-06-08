@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import '../blueprint/model/controller_layout.dart';
 import '../blueprint/model/graph.dart';
 import '../blueprint/model/pins.dart';
+import '../blueprint/model/variables.dart';
 import '../services/ev3_brick.dart';
 
 /// Executes a blueprint graph, UE5-style:
@@ -25,9 +26,17 @@ class GraphRunner extends ChangeNotifier {
     required this.graph,
     required this.layout,
     required Ev3Brick brick,
+    this.variables,
     // ignore: prefer_initializing_formals — the field is private.
   }) : _brick = brick {
     _attachBrick();
+    for (final v in variables?.variables ?? const <ProjectVariable>[]) {
+      _varStore[v.id] = switch (v.type) {
+        VarType.integer => 0,
+        VarType.boolean => false,
+        VarType.text => '',
+      };
+    }
     for (final tab in layout.tabs) {
       for (final control in tab.controls) {
         switch (control.kind) {
@@ -56,6 +65,10 @@ class GraphRunner extends ChangeNotifier {
 
   final BlueprintGraph graph;
   final ControllerLayout layout;
+  final VariableSet? variables;
+
+  /// Runtime values of project variables, keyed by variable id.
+  final Map<String, Object> _varStore = {};
 
   Ev3Brick _brick;
   Ev3Brick get brick => _brick;
@@ -264,6 +277,11 @@ class GraphRunner extends ChangeNotifier {
         brick.resetAngle(port);
         _lastMotorCommand.remove(port); // let the next command re-issue
         fire('then');
+      case 'var.set':
+        final varId = node.config['var'] as String? ?? '';
+        final value = _evalInput(node, 'value', {});
+        if (value != null) _varStore[varId] = value;
+        fire('then');
       case 'flow.branch':
         fire(_toBool(_evalInput(node, 'condition', {}), false)
             ? 'ifTrue'
@@ -379,6 +397,7 @@ class GraphRunner extends ChangeNotifier {
         'logic.imply' => !flag('a', false) || flag('b', false),
         'logic.nimply' => flag('a', false) && !flag('b', false),
         'flow.doN' => _doNCount[node.id] ?? 0,
+        'var.get' => _varStore[node.config['var'] as String? ?? ''],
         'motor.run' => brick.motorAngle(node.config['port'] as String? ?? 'A'),
         _ when node.defId.startsWith('sensor.') =>
           _readSensorPin(node, output.pinId),

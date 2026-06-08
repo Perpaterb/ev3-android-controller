@@ -2,6 +2,7 @@ import 'package:ev3_controller/blueprint/model/controller_layout.dart';
 import 'package:ev3_controller/blueprint/model/graph.dart';
 import 'package:ev3_controller/blueprint/model/node_def.dart';
 import 'package:ev3_controller/blueprint/model/pins.dart';
+import 'package:ev3_controller/blueprint/model/variables.dart';
 import 'package:ev3_controller/run/graph_runner.dart';
 import 'package:ev3_controller/services/ev3_brick.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -10,11 +11,13 @@ void main() {
   late ControllerLayout layout;
   late BlueprintGraph graph;
   late MockEv3Brick brick;
+  late VariableSet variables;
 
   setUp(() {
     layout = ControllerLayout();
     graph = BlueprintGraph();
     brick = MockEv3Brick();
+    variables = VariableSet();
   });
 
   ControllerControl addControl(ControlKind kind, String name) =>
@@ -46,8 +49,8 @@ void main() {
     );
   }
 
-  GraphRunner runner() =>
-      GraphRunner(graph: graph, layout: layout, brick: brick);
+  GraphRunner runner() => GraphRunner(
+      graph: graph, layout: layout, brick: brick, variables: variables);
 
   test('button press runs a motor with wired speed and direction', () {
     final go = addControl(ControlKind.button, 'Go');
@@ -741,6 +744,43 @@ void main() {
         r.tick();
       }
       expect(brick.motorAngle('A'), 90);
+    });
+
+    test('Set writes a variable on power; Get reads it', () {
+      final go = addControl(ControlKind.button, 'Go');
+      final readout = addControl(ControlKind.display, 'Score');
+      syncController();
+      final score = variables.create('Score', VarType.integer);
+      // Set Score = 42 when Go is pressed.
+      final setNode = graph.addDynamicNode(
+          varSetDef(score), Offset.zero, {'var': score.id});
+      final fortyTwo = node('value.int', {'value': 42});
+      wire(kControllerNodeId, '${go.id}.pressed', setNode.id, 'set');
+      wire(fortyTwo.id, 'value', setNode.id, 'value');
+      // Get Score → display.
+      final getNode = graph.addDynamicNode(
+          varGetDef(score), Offset.zero, {'var': score.id});
+      final toText = node('text.fromInt');
+      wire(getNode.id, 'value', toText.id, 'number');
+      wire(toText.id, 'result', kControllerNodeId, '${readout.id}.value');
+
+      final r = runner();
+      expect(r.displayValue(readout.id), '0'); // default before Set runs
+      r.buttonPressed(go.id);
+      expect(r.displayValue(readout.id), '42');
+    });
+
+    test('a Get without a Set returns the type default', () {
+      final readout = addControl(ControlKind.display, 'Score');
+      syncController();
+      final score = variables.create('Score', VarType.integer);
+      final getNode = graph.addDynamicNode(
+          varGetDef(score), Offset.zero, {'var': score.id});
+      final toText = node('text.fromInt');
+      wire(getNode.id, 'value', toText.id, 'number');
+      wire(toText.id, 'result', kControllerNodeId, '${readout.id}.value');
+
+      expect(runner().displayValue(readout.id), '0');
     });
 
     test('steering: a tick loop stops the motor at the angle limit', () {

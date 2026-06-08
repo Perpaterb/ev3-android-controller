@@ -5,6 +5,7 @@ import '../blueprint/model/controller_layout.dart';
 import '../blueprint/model/graph.dart';
 import '../blueprint/model/node_def.dart';
 import '../blueprint/model/pins.dart';
+import '../blueprint/model/variables.dart';
 import '../models/project.dart';
 import '../services/brick_connection.dart';
 import '../services/ev3_brick.dart';
@@ -54,12 +55,17 @@ class _RunModeState extends State<RunMode>
     WidgetsBinding.instance.addObserver(this);
     widget.connection?.addListener(_onConnectionChanged);
     _layout = ControllerLayout.fromJson(widget.project.controller);
+    final variables = VariableSet.fromJson(widget.project.variables);
     final graph = BlueprintGraph.fromJson(
       widget.project.graph,
       dynamicDefs: {kControllerDefId: _layout.buildNodeDef()},
+      variables: variables,
     );
-    _runner =
-        GraphRunner(graph: graph, layout: _layout, brick: _activeBrick);
+    _runner = GraphRunner(
+        graph: graph,
+        layout: _layout,
+        brick: _activeBrick,
+        variables: variables);
     _runner.start(); // fire On Start nodes
     // The UE5-style game loop: one runner tick per rendered frame. A
     // free-running ticker never lets the widget tree "settle", so it only
