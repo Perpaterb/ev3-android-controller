@@ -232,7 +232,7 @@ class NodeWidget extends StatelessWidget {
     final value = node.config['value'] as int? ?? 0;
     return Row(
       children: [
-        const Text('Value', style: _pinLabelStyle),
+        Text(node.def.configLabel ?? 'Value', style: _pinLabelStyle),
         const Spacer(),
         GestureDetector(
           key: Key('node-value-${node.id}'),
@@ -341,7 +341,7 @@ class NodeWidget extends StatelessWidget {
     final value = node.config['value'] == true;
     return Row(
       children: [
-        const Text('Value', style: _pinLabelStyle),
+        Text(node.def.configLabel ?? 'Value', style: _pinLabelStyle),
         const Spacer(),
         Switch(
           key: Key('node-value-${node.id}'),

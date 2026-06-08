@@ -23,6 +23,7 @@ enum NodeCategory {
   flow('Flow', Color(0xFF707C8C)),
   value('Values', Color(0xFF2F8F83)),
   text('Text', Color(0xFF9C4DCC)),
+  event('Events', Color(0xFFB23A48)),
   controller('Controller', Color(0xFF7E57C2));
 
   const NodeCategory(this.label, this.color);

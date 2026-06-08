@@ -62,18 +62,25 @@ class ControllerControl {
       (config['textSize'] as num?)?.toDouble() ?? 24.0;
 
   /// What this control *emits* — pins on the right of the controller node.
+  /// Momentary controls expose three power pins: `touched` fires once on
+  /// press, `released` once on release, and `held` (pin id `isDown`) every
+  /// tick while held — the UE5 model. (The press pin keeps its old id
+  /// `pressed` so existing saved wires survive.)
   List<PinSpec> get outputPins => switch (kind) {
         ControlKind.button => [
-            PinSpec('$id.pressed', '$name pressed', PinType.power),
+            PinSpec('$id.pressed', '$name touched', PinType.power),
             PinSpec('$id.released', '$name released', PinType.power),
+            PinSpec('$id.isDown', '$name held', PinType.power),
           ],
-        // Each direction is an independent button with its own pressed and
-        // released — hold "up" to drive while tapping left/right to steer.
+        // Each direction is an independent button with its own touched,
+        // released and held — hold "up" to drive while tapping left/right.
         ControlKind.dpad => [
             for (final direction in const ['up', 'down', 'left', 'right']) ...[
               PinSpec('$id.$direction', '$name $direction', PinType.power),
               PinSpec('$id.${direction}Released',
                   '$name $direction released', PinType.power),
+              PinSpec('$id.${direction}IsDown',
+                  '$name $direction held', PinType.power),
             ],
           ],
         ControlKind.slider => [

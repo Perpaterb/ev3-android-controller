@@ -74,10 +74,11 @@ void main() {
     await tester.tap(find.text('Add'));
     await tester.pumpAndSettle();
 
-    // Control visual plus its two pins on the node edge.
+    // Control visual plus its pins on the node edge.
     expect(find.text('Forward'), findsOneWidget);
-    expect(find.text('Forward pressed'), findsOneWidget);
+    expect(find.text('Forward touched'), findsOneWidget);
     expect(find.text('Forward released'), findsOneWidget);
+    expect(find.text('Forward held'), findsOneWidget);
 
     await saved(tester);
     final tabs = project.controller['tabs'] as List;
@@ -133,7 +134,7 @@ void main() {
     await tester.tap(find.text('Delete')); // confirm dialog
     await tester.pumpAndSettle();
 
-    expect(find.text('Go pressed'), findsNothing);
+    expect(find.text('Go touched'), findsNothing);
     final json = await saved(tester);
     expect(json['wires'], isEmpty);
     expect(project.controller['tabs'], isNotEmpty);
@@ -202,8 +203,8 @@ void main() {
     await tester.tap(find.text('Rename').last);
     await tester.pumpAndSettle();
 
-    expect(find.text('Launch pressed'), findsOneWidget);
-    expect(find.text('Go pressed'), findsNothing);
+    expect(find.text('Launch touched'), findsOneWidget);
+    expect(find.text('Go touched'), findsNothing);
   });
 
   testWidgets('tabs: add, switch, and controls stay per-tab', (tester) async {
@@ -220,7 +221,7 @@ void main() {
     await tester.tap(find.text('Tab 2'));
     await tester.pumpAndSettle();
     expect(find.text('Go'), findsNothing);
-    expect(find.text('Go pressed'), findsOneWidget);
+    expect(find.text('Go touched'), findsOneWidget);
 
     await tester.tap(find.text('Main'));
     await tester.pumpAndSettle();

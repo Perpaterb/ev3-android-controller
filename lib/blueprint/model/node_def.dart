@@ -24,6 +24,8 @@ class NodeDef {
     this.inputs = const [],
     this.outputs = const [],
     this.configKind = NodeConfigKind.none,
+    this.configLabel,
+    this.configDefault,
   });
 
   final String id;
@@ -32,6 +34,12 @@ class NodeDef {
   final List<PinSpec> inputs;
   final List<PinSpec> outputs;
   final NodeConfigKind configKind;
+
+  /// Label shown next to the config editor (defaults to a generic one).
+  final String? configLabel;
+
+  /// Starting value for a value-style config (number/yes-no/text).
+  final Object? configDefault;
 
   PinSpec? pin(String pinId, {required bool isOutput}) {
     for (final spec in isOutput ? outputs : inputs) {
@@ -50,9 +58,9 @@ class NodeDef {
         NodeConfigKind.none => {},
         NodeConfigKind.motorPort => {'port': 'A'},
         NodeConfigKind.sensorPort => {'port': '1'},
-        NodeConfigKind.intValue => {'value': 0},
-        NodeConfigKind.boolValue => {'value': false},
-        NodeConfigKind.stringValue => {'value': ''},
+        NodeConfigKind.intValue => {'value': configDefault ?? 0},
+        NodeConfigKind.boolValue => {'value': configDefault ?? false},
+        NodeConfigKind.stringValue => {'value': configDefault ?? ''},
       };
 }
 
@@ -282,6 +290,65 @@ const List<NodeDef> nodeCatalog = [
       PinSpec('then1', 'First', PinType.power),
       PinSpec('then2', 'Second', PinType.power),
     ],
+  ),
+  // Gate: lets power through `Enter` only while open; Open/Close/Toggle
+  // change its state, like UE5's Gate.
+  NodeDef(
+    id: 'flow.gate',
+    title: 'Gate',
+    category: NodeCategory.flow,
+    configKind: NodeConfigKind.boolValue,
+    configLabel: 'Start open',
+    inputs: [
+      PinSpec('enter', 'Enter', PinType.power),
+      PinSpec('open', 'Open', PinType.power),
+      PinSpec('close', 'Close', PinType.power),
+      PinSpec('toggle', 'Toggle', PinType.power),
+    ],
+    outputs: [PinSpec('exit', 'Exit', PinType.power)],
+  ),
+  // Do Once: passes power through the first time only, until Reset.
+  NodeDef(
+    id: 'flow.doOnce',
+    title: 'Do Once',
+    category: NodeCategory.flow,
+    configKind: NodeConfigKind.boolValue,
+    configLabel: 'Start closed',
+    inputs: [
+      PinSpec('exec', 'Do', PinType.power),
+      PinSpec('reset', 'Reset', PinType.power),
+    ],
+    outputs: [PinSpec('completed', 'Done', PinType.power)],
+  ),
+  // Do N Times: passes power through up to N times, until Reset.
+  NodeDef(
+    id: 'flow.doN',
+    title: 'Do N Times',
+    category: NodeCategory.flow,
+    configKind: NodeConfigKind.intValue,
+    configLabel: 'Times',
+    configDefault: 3,
+    inputs: [
+      PinSpec('exec', 'Do', PinType.power),
+      PinSpec('reset', 'Reset', PinType.power),
+    ],
+    outputs: [
+      PinSpec('exit', 'Then', PinType.power),
+      PinSpec('counter', 'Count', PinType.integer),
+    ],
+  ),
+  // Events
+  NodeDef(
+    id: 'event.tick',
+    title: 'Every Tick',
+    category: NodeCategory.event,
+    outputs: [PinSpec('tick', 'Each frame', PinType.power)],
+  ),
+  NodeDef(
+    id: 'event.start',
+    title: 'On Start',
+    category: NodeCategory.event,
+    outputs: [PinSpec('started', 'At launch', PinType.power)],
   ),
   // Values
   NodeDef(

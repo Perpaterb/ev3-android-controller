@@ -410,12 +410,12 @@ void main() {
     expect(r.displayValue(readout.id), 'true');
   });
 
-  test('power → string is 1 while a button is held, 0 when not', () {
+  test('power → string is 1 while a button is held (isDown), 0 when not', () {
     final go = addControl(ControlKind.button, 'Go');
     final readout = addControl(ControlKind.display, 'Held');
     syncController();
     final probe = node('text.fromPower');
-    wire(kControllerNodeId, '${go.id}.pressed', probe.id, 'power');
+    wire(kControllerNodeId, '${go.id}.isDown', probe.id, 'power');
     wire(probe.id, 'result', kControllerNodeId, '${readout.id}.value');
 
     final r = runner();
@@ -426,12 +426,12 @@ void main() {
     expect(r.displayValue(readout.id), '0');
   });
 
-  test('power → string follows a held d-pad direction', () {
+  test('power → string follows a held d-pad direction (isDown)', () {
     final drive = addControl(ControlKind.dpad, 'Drive');
     final readout = addControl(ControlKind.display, 'Up?');
     syncController();
     final probe = node('text.fromPower');
-    wire(kControllerNodeId, '${drive.id}.up', probe.id, 'power');
+    wire(kControllerNodeId, '${drive.id}.upIsDown', probe.id, 'power');
     wire(probe.id, 'result', kControllerNodeId, '${readout.id}.value');
 
     final r = runner();
@@ -440,22 +440,6 @@ void main() {
     expect(r.displayValue(readout.id), '1');
     r.dpadReleased(drive.id, 'up');
     expect(r.displayValue(readout.id), '0');
-  });
-
-  test('power → string wired to released is the inverse of held', () {
-    final go = addControl(ControlKind.button, 'Go');
-    final readout = addControl(ControlKind.display, 'Idle?');
-    syncController();
-    final probe = node('text.fromPower');
-    wire(kControllerNodeId, '${go.id}.released', probe.id, 'power');
-    wire(probe.id, 'result', kControllerNodeId, '${readout.id}.value');
-
-    final r = runner();
-    expect(r.displayValue(readout.id), '1'); // not held → power on released
-    r.buttonPressed(go.id);
-    expect(r.displayValue(readout.id), '0');
-    r.buttonReleased(go.id);
-    expect(r.displayValue(readout.id), '1');
   });
 
   test('power → string blinks 1 for pulse-only sources', () async {
@@ -530,5 +514,183 @@ void main() {
     final speed = addControl(ControlKind.slider, 'Speed');
     syncController();
     expect(runner().sliderValue(speed.id), 0);
+  });
+
+  group('tick model', () {
+    test('Every Tick fires power each tick', () {
+      final go = addControl(ControlKind.button, 'Go'); // just to have a brick
+      syncController();
+      final tick = node('event.tick');
+      final motor = node('motor.run', {'port': 'A'});
+      wire(tick.id, 'tick', motor.id, 'run');
+      // Unrelated button so syncController has something; silence unused.
+      expect(go.id, isNotEmpty);
+
+      final r = runner();
+      expect(brick.log, isEmpty); // nothing runs until the clock ticks
+      r.tick();
+      expect(brick.log, ['Motor A: run at 100% forward']);
+      r.tick(); // identical command deduped — no new log line
+      expect(brick.log, hasLength(1));
+    });
+
+    test('On Start fires once at start()', () {
+      syncController();
+      final start = node('event.start');
+      final motor = node('motor.run', {'port': 'B'});
+      wire(start.id, 'started', motor.id, 'run');
+
+      final r = runner();
+      expect(brick.log, isEmpty);
+      r.start();
+      expect(brick.log, ['Motor B: run at 100% forward']);
+      r.start(); // only the first start fires
+      expect(brick.log, hasLength(1));
+    });
+
+    test('a button held pin powers a motor every tick while held', () {
+      final go = addControl(ControlKind.button, 'Go');
+      syncController();
+      final motor = node('motor.run', {'port': 'A'});
+      final stop = node('motor.stop', {'port': 'A'});
+      wire(kControllerNodeId, '${go.id}.isDown', motor.id, 'run');
+      wire(kControllerNodeId, '${go.id}.released', stop.id, 'stop');
+
+      final r = runner();
+      r.tick(); // not held → nothing
+      expect(brick.log, isEmpty);
+
+      r.buttonPressed(go.id);
+      r.tick();
+      expect(brick.log, ['Motor A: run at 100% forward']);
+      r.tick(); // still held, deduped
+      expect(brick.log, hasLength(1));
+
+      r.buttonReleased(go.id); // released fires stop immediately
+      expect(brick.log.last, 'Motor A: stop');
+      r.tick();
+      expect(brick.log, hasLength(2)); // not held → no more runs
+    });
+
+    test('Gate only passes Enter while open', () {
+      final open = addControl(ControlKind.button, 'Open');
+      final close = addControl(ControlKind.button, 'Close');
+      syncController();
+      final tick = node('event.tick');
+      final gate = node('flow.gate'); // starts closed (default false)
+      final motor = node('motor.run', {'port': 'A'});
+      wire(tick.id, 'tick', gate.id, 'enter');
+      wire(kControllerNodeId, '${open.id}.pressed', gate.id, 'open');
+      wire(kControllerNodeId, '${close.id}.pressed', gate.id, 'close');
+      wire(gate.id, 'exit', motor.id, 'run');
+
+      final r = runner();
+      r.tick();
+      expect(brick.log, isEmpty); // closed → blocked
+
+      r.buttonPressed(open.id);
+      r.tick();
+      expect(brick.log, ['Motor A: run at 100% forward']);
+
+      r.buttonPressed(close.id);
+      r.tick();
+      r.tick();
+      expect(brick.log, hasLength(1)); // closed again → blocked
+    });
+
+    test('Gate can start open', () {
+      syncController();
+      final tick = node('event.tick');
+      final gate = node('flow.gate', {'value': true}); // start open
+      final motor = node('motor.run', {'port': 'A'});
+      wire(tick.id, 'tick', gate.id, 'enter');
+      wire(gate.id, 'exit', motor.id, 'run');
+
+      final r = runner();
+      r.tick();
+      expect(brick.log, ['Motor A: run at 100% forward']);
+    });
+
+    test('Do Once passes power one time until reset', () {
+      final go = addControl(ControlKind.button, 'Go');
+      final rst = addControl(ControlKind.button, 'Reset');
+      syncController();
+      final doOnce = node('flow.doOnce');
+      final seq = node('flow.sequence'); // counts fires via two motors
+      final motor = node('motor.run', {'port': 'A'});
+      final stop = node('motor.stop', {'port': 'A'});
+      wire(kControllerNodeId, '${go.id}.pressed', doOnce.id, 'exec');
+      wire(kControllerNodeId, '${rst.id}.pressed', doOnce.id, 'reset');
+      // Alternate run/stop so repeated fires would show in the log.
+      wire(doOnce.id, 'completed', seq.id, 'exec');
+      wire(seq.id, 'then1', motor.id, 'run');
+      wire(seq.id, 'then2', stop.id, 'stop');
+
+      final r = runner();
+      r.buttonPressed(go.id);
+      expect(brick.log, ['Motor A: run at 100% forward', 'Motor A: stop']);
+      r.buttonReleased(go.id);
+      r.buttonPressed(go.id); // blocked — already fired
+      expect(brick.log, hasLength(2));
+
+      r.buttonPressed(rst.id); // reset re-arms it
+      r.buttonReleased(go.id);
+      r.buttonPressed(go.id);
+      expect(brick.log, hasLength(4));
+    });
+
+    test('Do N Times passes power N times and exposes its count', () {
+      final go = addControl(ControlKind.button, 'Go');
+      final count = addControl(ControlKind.display, 'Count');
+      syncController();
+      final doN = node('flow.doN', {'value': 2});
+      final motor = node('motor.run', {'port': 'A'});
+      final stop = node('motor.stop', {'port': 'A'});
+      final seq = node('flow.sequence');
+      final toText = node('text.fromInt');
+      wire(kControllerNodeId, '${go.id}.pressed', doN.id, 'exec');
+      wire(doN.id, 'exit', seq.id, 'exec');
+      wire(seq.id, 'then1', motor.id, 'run');
+      wire(seq.id, 'then2', stop.id, 'stop');
+      wire(doN.id, 'counter', toText.id, 'number');
+      wire(toText.id, 'result', kControllerNodeId, '${count.id}.value');
+
+      final r = runner();
+      expect(r.displayValue(count.id), '0');
+      r.buttonPressed(go.id);
+      r.buttonReleased(go.id);
+      r.buttonPressed(go.id);
+      r.buttonReleased(go.id);
+      r.buttonPressed(go.id); // third press blocked
+      expect(brick.log, hasLength(4)); // only two run/stop pairs
+      expect(r.displayValue(count.id), '2'); // counter capped at N
+    });
+
+    test('steering: a tick loop stops the motor at the angle limit', () {
+      syncController();
+      // Each tick: if angle < 90 keep turning, else stop.
+      final tick = node('event.tick');
+      final branch = node('flow.branch');
+      final motor = node('motor.run', {'port': 'A'});
+      final limit = node('value.int', {'value': 90});
+      final less = node('math.less');
+      final stop = node('motor.stop', {'port': 'A'});
+      final speed = node('value.int', {'value': 100});
+      wire(motor.id, 'angle', less.id, 'a');
+      wire(limit.id, 'value', less.id, 'b');
+      wire(less.id, 'result', branch.id, 'condition');
+      wire(tick.id, 'tick', branch.id, 'exec');
+      wire(branch.id, 'ifTrue', motor.id, 'run');
+      wire(branch.id, 'ifFalse', stop.id, 'stop');
+      wire(speed.id, 'value', motor.id, 'speed');
+
+      final r = runner();
+      // Tick until the simulated angle crosses the limit.
+      for (var i = 0; i < 30; i++) {
+        r.tick();
+      }
+      expect(brick.motorAngle('A'), greaterThanOrEqualTo(90));
+      expect(brick.log.last, 'Motor A: stop'); // it stopped itself
+    });
   });
 }

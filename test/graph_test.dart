@@ -319,7 +319,7 @@ void main() {
       );
       final node = copy.node(kControllerNodeId)!;
       expect(node.position, const Offset(1, 2));
-      expect(node.def.outputs, hasLength(2));
+      expect(node.def.outputs, hasLength(3)); // touched, released, held
     });
 
     test('fromJson without the dynamic def skips the controller node', () {

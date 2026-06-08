@@ -17,8 +17,8 @@ void main() {
     expect(def.outputs, isEmpty);
   });
 
-  test('a button contributes pressed and released power outputs', () {
-    layout.addControl(
+  test('a button contributes touched, released and held power outputs', () {
+    final control = layout.addControl(
       tabId: layout.tabs.single.id,
       kind: ControlKind.button,
       name: 'Forward',
@@ -26,7 +26,12 @@ void main() {
     );
     final def = layout.buildNodeDef();
     expect(def.outputs.map((p) => p.label),
-        ['Forward pressed', 'Forward released']);
+        ['Forward touched', 'Forward released', 'Forward held']);
+    expect(def.outputs.map((p) => p.id), [
+      '${control.id}.pressed', // press pin keeps its old id for save-compat
+      '${control.id}.released',
+      '${control.id}.isDown',
+    ]);
     expect(def.outputs.every((p) => p.type == PinType.power), isTrue);
     expect(def.inputs, isEmpty);
   });
@@ -56,7 +61,7 @@ void main() {
         def.outputs.map((p) => p.type), [PinType.boolean, PinType.power]);
   });
 
-  test('a d-pad contributes pressed and released per direction', () {
+  test('a d-pad contributes touched, released and held per direction', () {
     layout.addControl(
       tabId: layout.tabs.single.id,
       kind: ControlKind.dpad,
@@ -64,10 +69,10 @@ void main() {
       position: const Offset(0.5, 0.5),
     );
     final outputs = layout.buildNodeDef().outputs;
-    expect(outputs, hasLength(8));
+    expect(outputs, hasLength(12)); // 4 directions × 3 pins
     expect(
       outputs.map((p) => p.label),
-      containsAll(['Drive left', 'Drive left released']),
+      containsAll(['Drive left', 'Drive left released', 'Drive left held']),
     );
   });
 
@@ -123,7 +128,7 @@ void main() {
     layout.renameControl(control.id, 'Go');
     final def = layout.buildNodeDef();
     expect(def.outputs.map((p) => p.id), idsBefore);
-    expect(def.outputs.first.label, 'Go pressed');
+    expect(def.outputs.first.label, 'Go touched');
   });
 
   test('removing a control removes its pins', () {
@@ -162,7 +167,7 @@ void main() {
       name: 'B',
       position: const Offset(0.5, 0.5),
     );
-    expect(layout.buildNodeDef().outputs, hasLength(4));
+    expect(layout.buildNodeDef().outputs, hasLength(6)); // 2 buttons × 3
   });
 
   test('the last tab cannot be removed', () {

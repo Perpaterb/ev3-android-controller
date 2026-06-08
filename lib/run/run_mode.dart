@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart' show Ticker;
 
 import '../blueprint/model/controller_layout.dart';
 import '../blueprint/model/graph.dart';
@@ -34,10 +35,12 @@ class RunMode extends StatefulWidget {
   State<RunMode> createState() => _RunModeState();
 }
 
-class _RunModeState extends State<RunMode> with WidgetsBindingObserver {
+class _RunModeState extends State<RunMode>
+    with WidgetsBindingObserver, SingleTickerProviderStateMixin {
   late final ControllerLayout _layout;
   late final GraphRunner _runner;
   final MockEv3Brick _practice = MockEv3Brick();
+  late final Ticker _ticker;
   int _activeTab = 0;
   bool _showLog = false;
   bool _lossShown = false;
@@ -57,10 +60,18 @@ class _RunModeState extends State<RunMode> with WidgetsBindingObserver {
     );
     _runner =
         GraphRunner(graph: graph, layout: _layout, brick: _activeBrick);
+    _runner.start(); // fire On Start nodes
+    // The UE5-style game loop: one runner tick per rendered frame. A
+    // free-running ticker never lets the widget tree "settle", so it only
+    // runs under the real app binding — tick logic is unit-tested on
+    // GraphRunner directly.
+    _ticker = createTicker((_) => _runner.tick());
+    if (WidgetsBinding.instance is WidgetsFlutterBinding) _ticker.start();
   }
 
   @override
   void dispose() {
+    _ticker.dispose();
     _activeBrick.stopAll(); // never leave motors running behind us
     _runner.dispose();
     widget.connection?.removeListener(_onConnectionChanged);

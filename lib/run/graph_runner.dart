@@ -41,6 +41,17 @@ class GraphRunner extends ChangeNotifier {
         }
       }
     }
+    // Seed stateful flow nodes from their configured starting state.
+    for (final node in graph.nodes) {
+      switch (node.defId) {
+        case 'flow.gate':
+          _gateOpen[node.id] = node.config['value'] == true;
+        case 'flow.doOnce':
+          _doOnceFired[node.id] = node.config['value'] == true;
+        case 'flow.doN':
+          _doNCount[node.id] = 0;
+      }
+    }
   }
 
   final BlueprintGraph graph;
@@ -55,6 +66,7 @@ class GraphRunner extends ChangeNotifier {
     if (identical(value, _brick)) return;
     _detachBrick();
     _brick = value;
+    _lastMotorCommand.clear(); // the new brick hasn't heard any command yet
     _attachBrick();
     notifyListeners();
   }
@@ -86,12 +98,28 @@ class GraphRunner extends ChangeNotifier {
   /// Per-node runtime state for stateful nodes (Power → String).
   final Map<String, Object> _nodeState = {};
 
+  /// Gate open/closed by node id.
+  final Map<String, bool> _gateOpen = {};
+
+  /// Do Once "already fired" flag by node id.
+  final Map<String, bool> _doOnceFired = {};
+
+  /// Do N Times counter by node id.
+  final Map<String, int> _doNCount = {};
+
+  /// Last motor command sent per port, so a 60 fps tick that keeps firing the
+  /// same Run doesn't spam Bluetooth (or the practice log) — only changes go
+  /// out.
+  final Map<String, String> _lastMotorCommand = {};
+
   /// Which momentary controls are currently held: button ids, plus
   /// `<dpadId>.<direction>` entries.
   final Set<String> _held = {};
 
   /// Decay timers for Power → String pulses from non-held sources.
   final Map<String, Timer> _pulseTimers = {};
+
+  bool _started = false;
 
   /// Power chains longer than this are cut — a kid can't build an infinite
   /// loop that hangs the app.
@@ -162,6 +190,41 @@ class GraphRunner extends ChangeNotifier {
     notifyListeners(); // lights and the command log may have changed
   }
 
+  // ---- the clock -----------------------------------------------------------
+
+  /// Fires every `On Start` node once. Call when Run mode opens.
+  void start() {
+    if (_started) return;
+    _started = true;
+    for (final node in graph.nodes) {
+      if (node.defId == 'event.start') {
+        _firePower(PinRef(node.id, 'started', isOutput: true), 0);
+      }
+    }
+    notifyListeners();
+  }
+
+  /// One frame of the UE5-style game loop: advance the practice simulation,
+  /// pour power out of every held control's `held` pin and every `Every
+  /// Tick` node, and repaint. Driven by a Ticker in Run mode; called
+  /// directly in tests.
+  void tick() {
+    final b = _brick;
+    if (b is MockEv3Brick) b.advanceSimulation();
+
+    for (final h in _held) {
+      // button id (no dot) → `<id>.isDown`; dpad `<id>.<dir>` → `<id>.<dir>IsDown`.
+      final pinId = h.contains('.') ? '${h}IsDown' : '$h.isDown';
+      _firePower(PinRef(kControllerNodeId, pinId, isOutput: true), 0);
+    }
+    for (final node in graph.nodes) {
+      if (node.defId == 'event.tick') {
+        _firePower(PinRef(node.id, 'tick', isOutput: true), 0);
+      }
+    }
+    notifyListeners();
+  }
+
   // ---- power propagation ---------------------------------------------------
 
   void _firePower(PinRef output, int depth) {
@@ -179,14 +242,15 @@ class GraphRunner extends ChangeNotifier {
 
     switch (node.defId) {
       case 'motor.run':
-        brick.runMotor(
-          node.config['port'] as String? ?? 'A',
-          speed: _toInt(_evalInput(node, 'speed', {}), 100).clamp(0, 100),
-          forward: _toBool(_evalInput(node, 'forward', {}), true),
-        );
+        final port = node.config['port'] as String? ?? 'A';
+        final speed = _toInt(_evalInput(node, 'speed', {}), 100).clamp(0, 100);
+        final forward = _toBool(_evalInput(node, 'forward', {}), true);
+        _sendMotor(port, 'run:$speed:$forward',
+            () => brick.runMotor(port, speed: speed, forward: forward));
         fire('then');
       case 'motor.stop':
-        brick.stopMotor(node.config['port'] as String? ?? 'A');
+        final port = node.config['port'] as String? ?? 'A';
+        _sendMotor(port, 'stop', () => brick.stopMotor(port));
         fire('then');
       case 'flow.branch':
         fire(_toBool(_evalInput(node, 'condition', {}), false)
@@ -196,6 +260,35 @@ class GraphRunner extends ChangeNotifier {
         // However many outputs it has grown, in order.
         for (final out in node.def.outputs) {
           fire(out.id);
+        }
+      case 'flow.gate':
+        switch (inputPin) {
+          case 'open':
+            _gateOpen[node.id] = true;
+          case 'close':
+            _gateOpen[node.id] = false;
+          case 'toggle':
+            _gateOpen[node.id] = !(_gateOpen[node.id] ?? false);
+          case 'enter':
+            if (_gateOpen[node.id] ?? false) fire('exit');
+        }
+      case 'flow.doOnce':
+        if (inputPin == 'reset') {
+          _doOnceFired[node.id] = false;
+        } else if (!(_doOnceFired[node.id] ?? false)) {
+          _doOnceFired[node.id] = true;
+          fire('completed');
+        }
+      case 'flow.doN':
+        if (inputPin == 'reset') {
+          _doNCount[node.id] = 0;
+        } else {
+          final limit = node.config['value'] as int? ?? 0;
+          final count = _doNCount[node.id] ?? 0;
+          if (count < limit) {
+            _doNCount[node.id] = count + 1;
+            fire('exit');
+          }
         }
       case 'text.fromPower':
         // A pulse from a non-held source shows as a short blink of "1".
@@ -210,6 +303,14 @@ class GraphRunner extends ChangeNotifier {
         // Pure nodes have no power inputs; nothing to do.
         break;
     }
+  }
+
+  /// Sends a motor command only when it differs from the last one for that
+  /// port — keeps tick-driven Run/Stop from flooding the wire.
+  void _sendMotor(String port, String command, VoidCallback send) {
+    if (_lastMotorCommand[port] == command) return;
+    _lastMotorCommand[port] = command;
+    send();
   }
 
   // ---- data evaluation -----------------------------------------------------
@@ -265,6 +366,7 @@ class GraphRunner extends ChangeNotifier {
         'logic.nor' => !(flag('a', false) || flag('b', false)),
         'logic.imply' => !flag('a', false) || flag('b', false),
         'logic.nimply' => flag('a', false) && !flag('b', false),
+        'flow.doN' => _doNCount[node.id] ?? 0,
         'motor.run' => brick.motorAngle(node.config['port'] as String? ?? 'A'),
         'sensor.touch' =>
           brick.touchPressed(_portNumber(node.config['port'])),
@@ -277,32 +379,24 @@ class GraphRunner extends ChangeNotifier {
     }
   }
 
-  /// "1" if power is flowing into the node, "0" if not. Wired to a held
-  /// control (button, d-pad direction) this reads the live held state;
-  /// `released` pins read the inverse; pulse-only sources fall back to the
-  /// blink state set in [_execute].
+  /// "1" if power is flowing into the node, "0" if not. Wired to a `held`
+  /// pin (button or d-pad direction) it reads the live held state; the
+  /// one-shot pins (touched, released, changed…) are pulses, so it shows a
+  /// short blink of "1" set in [_execute].
   String _powerLevelString(GraphNode node) {
     final wire = _wireInto(PinRef(node.id, 'power', isOutput: false));
     if (wire == null) return '0';
     if (wire.fromNode == kControllerNodeId) {
-      final pinId = wire.fromPin;
-      final dot = pinId.indexOf('.');
-      if (dot > 0) {
-        final controlId = pinId.substring(0, dot);
-        final capability = pinId.substring(dot + 1);
-        switch (capability) {
-          case 'pressed':
-            return _held.contains(controlId) ? '1' : '0';
-          case 'up' || 'down' || 'left' || 'right':
-            return _held.contains('$controlId.$capability') ? '1' : '0';
-          case 'released': // a button's released pin: inverse of held
-            return _held.contains(controlId) ? '0' : '1';
-          case _ when capability.endsWith('Released'):
-            // A d-pad direction's released pin: inverse of that direction.
-            final direction =
-                capability.substring(0, capability.length - 'Released'.length);
-            return _held.contains('$controlId.$direction') ? '0' : '1';
-        }
+      final capability = wire.fromPin.split('.').last;
+      if (capability == 'isDown') {
+        final controlId = wire.fromPin.split('.').first;
+        return _held.contains(controlId) ? '1' : '0';
+      }
+      if (capability.endsWith('IsDown')) {
+        // `<id>.<dir>IsDown` → held entry is `<id>.<dir>`.
+        final held =
+            wire.fromPin.substring(0, wire.fromPin.length - 'IsDown'.length);
+        return _held.contains(held) ? '1' : '0';
       }
     }
     return _nodeState[node.id] as String? ?? '0';
