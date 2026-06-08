@@ -60,6 +60,7 @@ const int _sockStream = 1;
 const int _btprotoRfcomm = 3;
 const int _sockaddrRcSize = 10; // u16 family + 6-byte bdaddr + u8 channel (+pad)
 const int _econnrefused = 111;
+const int _econnreset = 104; // peer reset — often a stale link, retry
 const int _eintr = 4; // interrupted syscall
 const int _einprogress = 115; // connect in progress; wait via poll
 const int _etimedout = 110;
@@ -107,39 +108,44 @@ class LinuxRfcommTransport implements Ev3Transport {
       throw FormatException('Bad Bluetooth address: $address');
     }
 
-    // Try the preferred RFCOMM channel first, then scan the low channels:
-    // the EV3's Serial Port service isn't always on channel 1. A refusal
-    // (ECONNREFUSED) means "reachable, but nothing listening there" → try
-    // the next channel; any other error means the brick itself is
-    // unreachable, so stop and report it.
+    // Try the preferred RFCOMM channel first, then a couple of low ones.
+    // ECONNREFUSED means "reachable, nothing listening there" → next channel.
+    // ECONNRESET/ETIMEDOUT are usually a stale link the brick is tearing
+    // down → retry the whole attempt a few times with a pause. Any other
+    // error means the brick is unreachable, so stop and report it.
     final channels = <int>[
       preferredChannel,
-      for (var c = 1; c <= 12; c++)
+      for (var c = 1; c <= 3; c++)
         if (c != preferredChannel) c,
     ];
+    const transient = {_econnreset, _etimedout};
     var lastErrno = 0;
-    for (final channel in channels) {
-      final fd = _socket(_afBluetooth, _sockStream, _btprotoRfcomm);
-      if (fd < 0) {
-        throw SocketException(
-            'Could not create a Bluetooth socket (${_explainErrno(_errno)}) '
-            '— is Bluetooth on?');
-      }
-      final addr = calloc<Uint8>(_sockaddrRcSize);
-      try {
-        addr[0] = _afBluetooth; // sa_family, little-endian u16
-        addr[1] = 0;
-        for (var i = 0; i < 6; i++) {
-          addr[2 + i] = parts[5 - i]; // bdaddr_t is reversed byte order
+    for (var attempt = 0; attempt < 4; attempt++) {
+      for (final channel in channels) {
+        final fd = _socket(_afBluetooth, _sockStream, _btprotoRfcomm);
+        if (fd < 0) {
+          throw SocketException(
+              'Could not create a Bluetooth socket (${_explainErrno(_errno)}) '
+              '— is Bluetooth on?');
         }
-        addr[8] = channel;
-        lastErrno = _connectFd(fd, addr);
-        if (lastErrno == 0) return fd;
-      } finally {
-        calloc.free(addr);
+        final addr = calloc<Uint8>(_sockaddrRcSize);
+        try {
+          addr[0] = _afBluetooth; // sa_family, little-endian u16
+          addr[1] = 0;
+          for (var i = 0; i < 6; i++) {
+            addr[2 + i] = parts[5 - i]; // bdaddr_t is reversed byte order
+          }
+          addr[8] = channel;
+          lastErrno = _connectFd(fd, addr);
+          if (lastErrno == 0) return fd;
+        } finally {
+          calloc.free(addr);
+        }
+        _close(fd);
+        if (lastErrno != _econnrefused) break; // try a retry pass, not channels
       }
-      _close(fd);
-      if (lastErrno != _econnrefused) break; // unreachable → stop scanning
+      if (!transient.contains(lastErrno)) break; // hard failure — stop
+      sleep(const Duration(milliseconds: 600)); // let a stale link clear
     }
     throw SocketException(
         'Could not reach the EV3 at $address — ${_explainErrno(lastErrno)}. '
