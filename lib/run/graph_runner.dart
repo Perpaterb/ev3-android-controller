@@ -125,6 +125,14 @@ class GraphRunner extends ChangeNotifier {
   /// out.
   final Map<String, String> _lastMotorCommand = {};
 
+  // Motors started by a per-tick source (a "down" pin or Every Tick) run
+  // only while that power keeps arriving: each tick records which ports were
+  // commanded, and any tick-driven port that goes a tick without power is
+  // stopped. A one-shot "touched" Run isn't tick-driven, so it persists.
+  bool _inTick = false;
+  final Set<String> _tickRunMotors = {};
+  final Set<String> _motorsRunThisTick = {};
+
   /// Which momentary controls are currently held: button ids, plus
   /// `<dpadId>.<direction>` entries.
   final Set<String> _held = {};
@@ -225,6 +233,8 @@ class GraphRunner extends ChangeNotifier {
     final b = _brick;
     if (b is MockEv3Brick) b.advanceSimulation();
 
+    _inTick = true;
+    _motorsRunThisTick.clear();
     for (final h in _held) {
       // button id (no dot) → `<id>.isDown`; dpad `<id>.<dir>` → `<id>.<dir>IsDown`.
       final pinId = h.contains('.') ? '${h}IsDown' : '$h.isDown';
@@ -235,6 +245,16 @@ class GraphRunner extends ChangeNotifier {
         _firePower(PinRef(node.id, 'tick', isOutput: true), 0);
       }
     }
+    // Stop any motor that was running from a per-tick source but wasn't
+    // commanded this tick (the button was released / the branch flipped).
+    for (final port in _tickRunMotors.toList()) {
+      if (!_motorsRunThisTick.contains(port)) {
+        _sendMotor(port, 'stop', () => brick.stopMotor(port));
+        _tickRunMotors.remove(port);
+      }
+    }
+    _tickRunMotors.addAll(_motorsRunThisTick);
+    _inTick = false;
     notifyListeners();
   }
 
@@ -260,6 +280,7 @@ class GraphRunner extends ChangeNotifier {
         final forward = _toBool(_evalInput(node, 'forward', {}), true);
         _sendMotor(port, 'run:$speed:$forward',
             () => brick.runMotor(port, speed: speed, forward: forward));
+        if (_inTick) _motorsRunThisTick.add(port);
         fire('then');
       case 'motor.stop':
         final port = node.config['port'] as String? ?? 'A';

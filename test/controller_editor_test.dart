@@ -78,7 +78,7 @@ void main() {
     expect(find.text('Forward'), findsOneWidget);
     expect(find.text('Forward touched'), findsOneWidget);
     expect(find.text('Forward released'), findsOneWidget);
-    expect(find.text('Forward held'), findsOneWidget);
+    expect(find.text('Forward down'), findsOneWidget);
 
     await saved(tester);
     final tabs = project.controller['tabs'] as List;

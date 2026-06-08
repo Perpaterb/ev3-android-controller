@@ -202,6 +202,46 @@ void main() {
     expect(saved['wires'] ?? [], isEmpty);
   });
 
+  testWidgets('the disconnect button removes all wires on a tapped pin',
+      (tester) async {
+    final graph = seed();
+    final number =
+        graph.addNode(nodeDefById('value.int')!, const Offset(-700, -200));
+    final add =
+        graph.addNode(nodeDefById('math.add')!, const Offset(-400, -200));
+    // Fan the number out to both of Add's inputs.
+    graph.connect(PinRef(number.id, 'value', isOutput: true),
+        PinRef(add.id, 'a', isOutput: false));
+    graph.connect(PinRef(number.id, 'value', isOutput: true),
+        PinRef(add.id, 'b', isOutput: false));
+    persist(graph);
+    await pumpEditor(tester);
+
+    // Tap the output pin; the banner offers a disconnect button.
+    await tester.tap(pin(number, 'value', isOutput: true));
+    await tester.pump();
+    expect(find.byKey(const Key('disconnect-pin')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('disconnect-pin')));
+    await tester.pump();
+    expect(find.byKey(const Key('cancel-wiring')), findsNothing); // exited
+    final saved = await savedGraph(tester);
+    expect(saved['wires'], isEmpty); // both wires gone
+  });
+
+  testWidgets('no disconnect button on a pin with no wires', (tester) async {
+    final graph = seed();
+    final number =
+        graph.addNode(nodeDefById('value.int')!, const Offset(-700, -200));
+    persist(graph);
+    await pumpEditor(tester);
+
+    await tester.tap(pin(number, 'value', isOutput: true));
+    await tester.pump();
+    expect(find.byKey(const Key('disconnect-pin')), findsNothing);
+    expect(find.byKey(const Key('cancel-wiring')), findsOneWidget);
+  });
+
   testWidgets('the red X cancels wiring mode', (tester) async {
     final graph = seed();
     final number =

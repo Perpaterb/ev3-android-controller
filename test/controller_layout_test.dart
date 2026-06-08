@@ -26,7 +26,7 @@ void main() {
     );
     final def = layout.buildNodeDef();
     expect(def.outputs.map((p) => p.label),
-        ['Forward touched', 'Forward released', 'Forward held']);
+        ['Forward touched', 'Forward released', 'Forward down']);
     expect(def.outputs.map((p) => p.id), [
       '${control.id}.pressed', // press pin keeps its old id for save-compat
       '${control.id}.released',

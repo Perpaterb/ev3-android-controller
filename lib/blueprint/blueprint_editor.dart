@@ -826,6 +826,9 @@ class _BlueprintEditorState extends State<BlueprintEditor> {
   }
 
   Widget _buildWiringBanner() {
+    final from = _wiringFrom!;
+    final hasWires = _graph.wires
+        .any((w) => from.isOutput ? w.from == from : w.to == from);
     return Positioned(
       top: 12,
       left: 0,
@@ -844,6 +847,21 @@ class _BlueprintEditorState extends State<BlueprintEditor> {
                   style: TextStyle(color: Colors.white),
                 ),
                 const SizedBox(width: 10),
+                if (hasWires) ...[
+                  FloatingActionButton.small(
+                    key: const Key('disconnect-pin'),
+                    heroTag: 'disconnect-pin',
+                    backgroundColor: Colors.orange,
+                    foregroundColor: Colors.white,
+                    tooltip: 'Disconnect this pin',
+                    onPressed: () {
+                      _onDisconnectPin(from);
+                      _cancelWiring();
+                    },
+                    child: const Icon(Icons.link_off),
+                  ),
+                  const SizedBox(width: 6),
+                ],
                 FloatingActionButton.small(
                   key: const Key('cancel-wiring'),
                   heroTag: 'cancel-wiring',

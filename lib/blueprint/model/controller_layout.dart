@@ -78,10 +78,12 @@ class ControllerControl {
         ControlKind.button => [
             PinSpec('$id.pressed', '$name touched', PinType.power),
             PinSpec('$id.released', '$name released', PinType.power),
-            PinSpec('$id.isDown', '$name held', PinType.power),
+            PinSpec('$id.isDown', '$name down', PinType.power),
           ],
         // Each direction is an independent button with its own touched,
         // released and held — hold "up" to drive while tapping left/right.
+        // (The continuous pin stays "held" here, since "down" is also a
+        // direction — "Drive down held" reads clearer than "Drive down down".)
         ControlKind.dpad => [
             for (final direction in const ['up', 'down', 'left', 'right']) ...[
               PinSpec('$id.$direction', '$name $direction', PinType.power),

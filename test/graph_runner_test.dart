@@ -595,13 +595,14 @@ void main() {
       expect(brick.log, hasLength(1));
     });
 
-    test('a button held pin powers a motor every tick while held', () {
+    test('a motor wired to a down pin runs while held and stops on release',
+        () {
       final go = addControl(ControlKind.button, 'Go');
       syncController();
       final motor = node('motor.run', {'port': 'A'});
-      final stop = node('motor.stop', {'port': 'A'});
+      // Only the "down" pin → Run. No explicit Stop wire: releasing the
+      // button must stop the motor on its own.
       wire(kControllerNodeId, '${go.id}.isDown', motor.id, 'run');
-      wire(kControllerNodeId, '${go.id}.released', stop.id, 'stop');
 
       final r = runner();
       r.tick(); // not held → nothing
@@ -610,13 +611,28 @@ void main() {
       r.buttonPressed(go.id);
       r.tick();
       expect(brick.log, ['Motor A: run at 100% forward']);
-      r.tick(); // still held, deduped
+      r.tick(); // still held, deduped — no new command
       expect(brick.log, hasLength(1));
 
-      r.buttonReleased(go.id); // released fires stop immediately
-      expect(brick.log.last, 'Motor A: stop');
+      r.buttonReleased(go.id);
+      r.tick(); // first tick without power → auto-stop
+      expect(brick.log, ['Motor A: run at 100% forward', 'Motor A: stop']);
       r.tick();
-      expect(brick.log, hasLength(2)); // not held → no more runs
+      expect(brick.log, hasLength(2)); // stays stopped
+    });
+
+    test('a touched (one-shot) Run is NOT auto-stopped', () {
+      final go = addControl(ControlKind.button, 'Go');
+      syncController();
+      final motor = node('motor.run', {'port': 'A'});
+      wire(kControllerNodeId, '${go.id}.pressed', motor.id, 'run');
+
+      final r = runner();
+      r.buttonPressed(go.id); // one-shot start
+      expect(brick.log, ['Motor A: run at 100% forward']);
+      r.tick();
+      r.tick(); // ticks must not stop a one-shot-started motor
+      expect(brick.log, hasLength(1));
     });
 
     test('Gate only passes Enter while open', () {
@@ -640,9 +656,10 @@ void main() {
       expect(brick.log, ['Motor A: run at 100% forward']);
 
       r.buttonPressed(close.id);
+      r.tick(); // gate closed → motor no longer powered → auto-stops
+      expect(brick.log, ['Motor A: run at 100% forward', 'Motor A: stop']);
       r.tick();
-      r.tick();
-      expect(brick.log, hasLength(1)); // closed again → blocked
+      expect(brick.log, hasLength(2)); // stays blocked + stopped
     });
 
     test('Gate can start open', () {
