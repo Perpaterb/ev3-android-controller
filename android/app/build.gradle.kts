@@ -27,8 +27,9 @@ android {
     }
 
     defaultConfig {
-        // Permanent Play Store identity for BrickLogic.
-        applicationId = "dev.perpaterb.bricklogic"
+        // Permanent Play Store identity — must match the package name the
+        // Play Console listing was created with.
+        applicationId = "com.BrickLogic"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode

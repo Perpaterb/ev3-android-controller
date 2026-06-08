@@ -3,8 +3,8 @@
 BrickLogic ships to Play as an **Android App Bundle** (`.aab`). This is a
 one-time keystore setup, then a single command per release.
 
-- **Application ID:** `dev.perpaterb.bricklogic` (permanent — set in
-  `android/app/build.gradle.kts`)
+- **Application ID:** `com.BrickLogic` (permanent — must match the Play
+  Console listing; set in `android/app/build.gradle.kts`)
 - **Version:** set by `version:` in `pubspec.yaml`, e.g. `1.0.0+1`
   (`1.0.0` is the versionName shown to users; `+1` is the versionCode Play
   uses to order builds — it must increase every upload).
