@@ -1,5 +1,6 @@
 import 'dart:io' show SocketException;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../services/brick_connection.dart';
@@ -74,15 +75,19 @@ class _DeviceListState extends State<_DeviceList> {
   Future<void> _connect(Ev3Device device) async {
     final messenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
+    debugPrint('[BrickLogic] connecting to ${device.name} (${device.address})…');
     try {
       await widget.connection.connect(device);
+      debugPrint('[BrickLogic] connected to ${device.name}');
       navigator.pop();
       messenger.showSnackBar(
           SnackBar(content: Text('Connected to ${device.name}!')));
-    } catch (e) {
-      // Surface the real reason (errno text from the transport) so a failed
-      // connection can actually be diagnosed.
+    } catch (e, stack) {
+      // Surface the real reason (errno text from the transport) both on
+      // screen and to the console/DevTools log, so it can be copied.
       final detail = e is SocketException ? e.message : '$e';
+      debugPrint('[BrickLogic] connect FAILED: $detail');
+      debugPrintStack(stackTrace: stack, label: '[BrickLogic] connect error');
       messenger.showSnackBar(SnackBar(
         duration: const Duration(seconds: 6),
         content: Text("Couldn't connect to ${device.name}: $detail"),
