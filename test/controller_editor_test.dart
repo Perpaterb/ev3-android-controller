@@ -190,6 +190,38 @@ void main() {
     );
   });
 
+  testWidgets('turning off a capability removes its pin and prunes wires',
+      (tester) async {
+    final go = seedButton('Go');
+    final def = ControllerLayout.fromJson(project.controller).buildNodeDef();
+    final graph = BlueprintGraph.fromJson(
+      {},
+      dynamicDefs: {kControllerDefId: def},
+    );
+    graph.ensureControllerNode(def, const Offset(-230, -150));
+    final motor =
+        graph.addNode(nodeDefById('motor.run')!, const Offset(360, -40));
+    // Wire the "held" pin to the motor, then turn "held" off.
+    graph.connect(
+      PinRef(kControllerNodeId, '${go.id}.isDown', isOutput: true),
+      PinRef(motor.id, 'run', isOutput: false),
+    );
+    project.graph.addAll(graph.toJson());
+    await pumpEditor(tester);
+
+    final heldPin = find.byKey(Key('pin-controller-${go.id}.isDown-out'));
+    expect(heldPin, findsOneWidget);
+
+    await tester.tap(find.byKey(Key('control-${go.id}')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('control-cap-isDown')));
+    await tester.pumpAndSettle();
+
+    expect(heldPin, findsNothing); // pin removed from the node
+    final json = await saved(tester);
+    expect(json['wires'], isEmpty); // its wire was pruned
+  });
+
   testWidgets('renaming a control relabels its pins but keeps wires',
       (tester) async {
     final control = seedButton('Go');

@@ -666,6 +666,39 @@ void main() {
       expect(r.displayValue(count.id), '2'); // counter capped at N
     });
 
+    test('Reset Angle zeroes the counter', () {
+      final go = addControl(ControlKind.button, 'Go');
+      syncController();
+      final reset = node('motor.reset', {'port': 'A'});
+      wire(kControllerNodeId, '${go.id}.pressed', reset.id, 'reset');
+
+      brick.motorAngles['A'] = 250;
+      final r = runner();
+      r.buttonPressed(go.id);
+      expect(brick.motorAngle('A'), 0);
+      expect(brick.log.last, 'Motor A: reset angle');
+    });
+
+    test('Turn to Angle drives to an absolute position and holds', () {
+      final left = addControl(ControlKind.dpad, 'Steer');
+      syncController();
+      final toAngle = node('motor.toAngle', {'port': 'A'});
+      final target = node('value.int', {'value': 90});
+      final speed = node('value.int', {'value': 100});
+      wire(kControllerNodeId, '${left.id}.left', toAngle.id, 'run');
+      wire(target.id, 'value', toAngle.id, 'angle');
+      wire(speed.id, 'value', toAngle.id, 'speed');
+
+      final r = runner();
+      r.dpadPressed(left.id, 'left');
+      expect(brick.log.last, 'Motor A: turn to 90° at 100%');
+      // The sim drives toward the target and brakes there.
+      for (var i = 0; i < 60; i++) {
+        r.tick();
+      }
+      expect(brick.motorAngle('A'), 90);
+    });
+
     test('steering: a tick loop stops the motor at the angle limit', () {
       syncController();
       // Each tick: if angle < 90 keep turning, else stop.

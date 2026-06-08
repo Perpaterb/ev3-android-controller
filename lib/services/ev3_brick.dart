@@ -12,6 +12,13 @@ abstract class Ev3Brick {
   /// Safety: kill every motor (leaving Run mode, app backgrounded, …).
   void stopAll();
 
+  /// Drives the motor to an absolute [targetAngle] and brakes there.
+  void runToAngle(String port, {required int targetAngle, required int speed});
+
+  /// Zeroes the motor's angle counter, so future angles are measured from
+  /// here (a known reference for steering, rotation counting, …).
+  void resetAngle(String port);
+
   int motorAngle(String port);
 
   /// [port] is an input port 1-4.
@@ -39,6 +46,9 @@ class MockEv3Brick extends ChangeNotifier implements Ev3Brick {
   /// Running motors → signed speed (negative = backward). Drives the sim.
   final Map<String, int> _runningMotors = {};
 
+  /// Motors driving to a target angle → (target, signed speed).
+  final Map<String, (int, int)> _motorTargets = {};
+
   /// Simulated degrees-per-tick at full speed; a real LEGO motor is roughly
   /// in this ballpark at 60 fps.
   static const double _degreesPerTickAtFullSpeed = 0.25;
@@ -48,20 +58,35 @@ class MockEv3Brick extends ChangeNotifier implements Ev3Brick {
     notifyListeners();
   }
 
-  /// Advances every running motor's angle one frame's worth.
+  /// Advances every moving motor's angle one frame's worth.
   void advanceSimulation() {
-    if (_runningMotors.isEmpty) return;
+    if (_runningMotors.isEmpty && _motorTargets.isEmpty) return;
+    var changed = false;
     for (final entry in _runningMotors.entries) {
       final step = (entry.value * _degreesPerTickAtFullSpeed).round();
       if (step != 0) {
         motorAngles[entry.key] = (motorAngles[entry.key] ?? 0) + step;
+        changed = true;
       }
     }
-    notifyListeners();
+    for (final port in _motorTargets.keys.toList()) {
+      final (target, speed) = _motorTargets[port]!;
+      final current = motorAngles[port] ?? 0;
+      final step = (speed.abs() * _degreesPerTickAtFullSpeed).round();
+      if ((target - current).abs() <= step) {
+        motorAngles[port] = target; // arrived; brake and hold
+        _motorTargets.remove(port);
+      } else {
+        motorAngles[port] = current + (target > current ? step : -step);
+      }
+      changed = true;
+    }
+    if (changed) notifyListeners();
   }
 
   @override
   void runMotor(String port, {required int speed, required bool forward}) {
+    _motorTargets.remove(port);
     _runningMotors[port] = forward ? speed : -speed;
     _log('Motor $port: run at $speed% ${forward ? 'forward' : 'backward'}');
   }
@@ -69,13 +94,30 @@ class MockEv3Brick extends ChangeNotifier implements Ev3Brick {
   @override
   void stopMotor(String port) {
     _runningMotors.remove(port);
+    _motorTargets.remove(port);
     _log('Motor $port: stop');
   }
 
   @override
   void stopAll() {
     _runningMotors.clear();
+    _motorTargets.clear();
     _log('All motors: stop');
+  }
+
+  @override
+  void runToAngle(String port,
+      {required int targetAngle, required int speed}) {
+    _runningMotors.remove(port);
+    _motorTargets[port] = (targetAngle, speed);
+    _log('Motor $port: turn to $targetAngle° at $speed%');
+  }
+
+  @override
+  void resetAngle(String port) {
+    motorAngles[port] = 0;
+    _motorTargets.remove(port);
+    _log('Motor $port: reset angle');
   }
 
   @override

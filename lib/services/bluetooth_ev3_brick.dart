@@ -65,6 +65,23 @@ class BluetoothEv3Brick extends ChangeNotifier implements Ev3Brick {
       Ev3Commands.stopMotors(_nextCounter(), Ev3Commands.allOutputsMask));
 
   @override
+  void runToAngle(String port,
+      {required int targetAngle, required int speed}) {
+    // EV3 step commands run relative degrees, so aim from the last known
+    // angle toward the target.
+    final delta = targetAngle - motorAngle(port);
+    if (delta == 0) return;
+    _send(Ev3Commands.stepDegrees(_nextCounter(), port,
+        degrees: delta, speed: speed));
+  }
+
+  @override
+  void resetAngle(String port) {
+    _angleCache[port] = 0;
+    _send(Ev3Commands.clearCount(_nextCounter(), Ev3Commands.outputMask(port)));
+  }
+
+  @override
   bool touchPressed(int port) {
     _watchedTouch.add(port);
     return _touchCache[port] ?? false;

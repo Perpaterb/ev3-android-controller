@@ -102,6 +102,31 @@ void main() {
     expect(def.inputs.single.type, PinType.string);
   });
 
+  test('disabling a capability removes its pin and persists', () {
+    final control = layout.addControl(
+      tabId: layout.tabs.single.id,
+      kind: ControlKind.button,
+      name: 'Go',
+      position: const Offset(0.5, 0.5),
+    );
+    // All three button pins by default.
+    expect(layout.buildNodeDef().outputs, hasLength(3));
+    expect(control.capabilities.map((c) => c.suffix),
+        ['pressed', 'released', 'isDown']);
+
+    layout.setCapabilityEnabled(control.id, 'released', false);
+    layout.setCapabilityEnabled(control.id, 'isDown', false);
+    final pins = layout.buildNodeDef().outputs;
+    expect(pins, hasLength(1));
+    expect(pins.single.label, 'Go touched');
+
+    final copy = ControllerLayout.fromJson(layout.toJson());
+    expect(copy.control(control.id)!.outputPins, hasLength(1));
+    // Re-enabling brings it back.
+    copy.setCapabilityEnabled(control.id, 'released', true);
+    expect(copy.control(control.id)!.outputPins, hasLength(2));
+  });
+
   test('showName defaults to true and persists when switched off', () {
     final control = layout.addControl(
       tabId: layout.tabs.single.id,

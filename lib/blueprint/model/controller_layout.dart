@@ -57,16 +57,24 @@ class ControllerControl {
   /// Whether the control's name is drawn on the Run screen.
   bool get showName => config['showName'] != false;
 
+  /// Capability suffixes the user has switched off, so they make no pin on
+  /// the controller node (declutter). e.g. {'isDown', 'released'}.
+  Set<String> get hiddenCapabilities =>
+      ((config['hidden'] as List?)?.cast<String>() ?? const []).toSet();
+
+  bool capabilityEnabled(String suffix) =>
+      !hiddenCapabilities.contains(suffix);
+
   /// Text size (in stage units) for display controls.
   double get displayTextSize =>
       (config['textSize'] as num?)?.toDouble() ?? 24.0;
 
-  /// What this control *emits* — pins on the right of the controller node.
-  /// Momentary controls expose three power pins: `touched` fires once on
-  /// press, `released` once on release, and `held` (pin id `isDown`) every
-  /// tick while held — the UE5 model. (The press pin keeps its old id
+  /// Every pin this control could emit, before the user's declutter
+  /// choices. Momentary controls expose three power pins: `touched` fires
+  /// once on press, `released` once on release, and `held` (pin id `isDown`)
+  /// every tick while held — the UE5 model. (The press pin keeps its old id
   /// `pressed` so existing saved wires survive.)
-  List<PinSpec> get outputPins => switch (kind) {
+  List<PinSpec> get _allOutputPins => switch (kind) {
         ControlKind.button => [
             PinSpec('$id.pressed', '$name touched', PinType.power),
             PinSpec('$id.released', '$name released', PinType.power),
@@ -95,8 +103,7 @@ class ControllerControl {
         ControlKind.display => const [],
       };
 
-  /// What this control *displays* — pins on the left of the controller node.
-  List<PinSpec> get inputPins => switch (kind) {
+  List<PinSpec> get _allInputPins => switch (kind) {
         ControlKind.light => [
             PinSpec('$id.on', '$name on?', PinType.boolean),
           ],
@@ -105,6 +112,27 @@ class ControllerControl {
           ],
         _ => const [],
       };
+
+  String _suffix(String pinId) => pinId.substring(id.length + 1);
+
+  /// Outputs the control actually exposes (hidden capabilities removed).
+  List<PinSpec> get outputPins => _allOutputPins
+      .where((p) => capabilityEnabled(_suffix(p.id)))
+      .toList();
+
+  /// Inputs the control actually exposes (hidden capabilities removed).
+  List<PinSpec> get inputPins => _allInputPins
+      .where((p) => capabilityEnabled(_suffix(p.id)))
+      .toList();
+
+  /// All capabilities (suffix + label + side) for the declutter menu, before
+  /// filtering — so the user can toggle each one.
+  List<({String suffix, String label, bool isInput})> get capabilities => [
+        for (final p in _allOutputPins)
+          (suffix: _suffix(p.id), label: p.label, isInput: false),
+        for (final p in _allInputPins)
+          (suffix: _suffix(p.id), label: p.label, isInput: true),
+      ];
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -351,6 +379,21 @@ class ControllerLayout extends ChangeNotifier {
     final target = control(id);
     if (target == null) return;
     target.config['showName'] = show;
+    notifyListeners();
+  }
+
+  /// Turns one of a control's output/input capabilities on or off. Off ones
+  /// produce no pin on the controller node; the graph prunes their wires.
+  void setCapabilityEnabled(String id, String suffix, bool enabled) {
+    final target = control(id);
+    if (target == null) return;
+    final hidden = target.hiddenCapabilities;
+    if (enabled) {
+      hidden.remove(suffix);
+    } else {
+      hidden.add(suffix);
+    }
+    target.config['hidden'] = hidden.toList();
     notifyListeners();
   }
 

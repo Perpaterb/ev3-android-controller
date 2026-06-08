@@ -401,6 +401,28 @@ class _BlueprintEditorState extends State<BlueprintEditor> {
                   setSheetState(() {});
                 },
               ),
+              if (control.capabilities.length > 1) ...[
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
+                  child: Text('Pins on the controller node',
+                      style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+                for (final cap in control.capabilities)
+                  SwitchListTile(
+                    key: Key('control-cap-${cap.suffix}'),
+                    dense: true,
+                    secondary: Icon(cap.isInput
+                        ? Icons.login
+                        : Icons.logout),
+                    title: Text(cap.label),
+                    value: control.capabilityEnabled(cap.suffix),
+                    onChanged: (value) {
+                      _layout.setCapabilityEnabled(
+                          control.id, cap.suffix, value);
+                      setSheetState(() {});
+                    },
+                  ),
+              ],
               ListTile(
                 key: const Key('control-rename'),
                 leading: const Icon(Icons.edit),

@@ -252,6 +252,18 @@ class GraphRunner extends ChangeNotifier {
         final port = node.config['port'] as String? ?? 'A';
         _sendMotor(port, 'stop', () => brick.stopMotor(port));
         fire('then');
+      case 'motor.toAngle':
+        final port = node.config['port'] as String? ?? 'A';
+        final angle = _toInt(_evalInput(node, 'angle', {}), 0);
+        final speed = _toInt(_evalInput(node, 'speed', {}), 50).clamp(1, 100);
+        _sendMotor(port, 'angle:$angle:$speed',
+            () => brick.runToAngle(port, targetAngle: angle, speed: speed));
+        fire('then');
+      case 'motor.reset':
+        final port = node.config['port'] as String? ?? 'A';
+        brick.resetAngle(port);
+        _lastMotorCommand.remove(port); // let the next command re-issue
+        fire('then');
       case 'flow.branch':
         fire(_toBool(_evalInput(node, 'condition', {}), false)
             ? 'ifTrue'

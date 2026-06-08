@@ -64,7 +64,7 @@ class _ControllerNodeWidgetState extends State<ControllerNodeWidget> {
 
   static const Color _bodyColor = Color(0xFF2B313A);
   static const TextStyle _pinLabelStyle =
-      TextStyle(color: Colors.white70, fontSize: 10);
+      TextStyle(color: Colors.white70, fontSize: 12);
 
   @override
   Widget build(BuildContext context) {

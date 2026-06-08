@@ -91,6 +91,28 @@ const List<NodeDef> nodeCatalog = [
     inputs: [PinSpec('stop', 'Stop', PinType.power)],
     outputs: [PinSpec('then', 'Then', PinType.power)],
   ),
+  // Drives to an exact angle and holds — great for steering to a limit.
+  NodeDef(
+    id: 'motor.toAngle',
+    title: 'Turn to Angle',
+    category: NodeCategory.motor,
+    configKind: NodeConfigKind.motorPort,
+    inputs: [
+      PinSpec('run', 'Go', PinType.power),
+      PinSpec('angle', 'Angle', PinType.integer),
+      PinSpec('speed', 'Speed', PinType.integer),
+    ],
+    outputs: [PinSpec('then', 'Then', PinType.power)],
+  ),
+  // Zeroes the angle counter so it measures from here.
+  NodeDef(
+    id: 'motor.reset',
+    title: 'Reset Angle',
+    category: NodeCategory.motor,
+    configKind: NodeConfigKind.motorPort,
+    inputs: [PinSpec('reset', 'Reset', PinType.power)],
+    outputs: [PinSpec('then', 'Then', PinType.power)],
+  ),
   // Sensors
   NodeDef(
     id: 'sensor.touch',

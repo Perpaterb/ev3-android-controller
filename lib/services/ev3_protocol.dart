@@ -14,6 +14,8 @@ class Ev3Commands {
   static const int _opOutputSpeed = 0xA5;
   static const int _opOutputStart = 0xA6;
   static const int _opOutputStop = 0xA3;
+  static const int _opOutputStepSpeed = 0xAE;
+  static const int _opOutputClrCount = 0xB2;
   static const int _opOutputGetCount = 0xB3;
   static const int _opInputDevice = 0x99;
   static const int _cmdReadySi = 0x1D;
@@ -41,6 +43,8 @@ class Ev3Commands {
   // Parameter encodings.
   static List<int> _lc0(int v) => [v & 0x3F]; // 6-bit immediate
   static List<int> _lc1(int v) => [0x81, v & 0xFF]; // 1-byte follows
+  static List<int> _lcInt(int v) => // 4-byte follows (for large counts)
+      [0x83, v & 0xFF, (v >> 8) & 0xFF, (v >> 16) & 0xFF, (v >> 24) & 0xFF];
   static List<int> _gv0(int index) => [0x60 | (index & 0x1F)]; // global var
 
   static Uint8List _frame(
@@ -99,6 +103,35 @@ class Ev3Commands {
       ..._lc0(mode),
       ..._lc0(1), // one value
       ..._gv0(0),
+    ]);
+  }
+
+  /// Runs the motor a fixed number of [degrees] then brakes. Negative
+  /// degrees run backward. The brick counts and stops itself — no
+  /// graph-side angle watching needed.
+  static Uint8List stepDegrees(int counter, String port,
+      {required int degrees, required int speed}) {
+    final mask = outputMask(port);
+    final magnitude = speed.abs().clamp(0, 100);
+    final signedSpeed = degrees < 0 ? -magnitude : magnitude;
+    return _frame(counter, reply: false, bytecodes: [
+      _opOutputStepSpeed,
+      ..._lc0(0), // layer
+      ..._lc0(mask),
+      ..._lc1(signedSpeed),
+      ..._lc0(0), // ramp-up steps
+      ..._lcInt(degrees.abs()), // constant steps (degrees)
+      ..._lc0(0), // ramp-down steps
+      ..._lc0(1), // brake at the end
+    ]);
+  }
+
+  /// Zeroes the motor's tacho counter.
+  static Uint8List clearCount(int counter, int portMask) {
+    return _frame(counter, reply: false, bytecodes: [
+      _opOutputClrCount,
+      ..._lc0(0),
+      ..._lc0(portMask),
     ]);
   }
 
