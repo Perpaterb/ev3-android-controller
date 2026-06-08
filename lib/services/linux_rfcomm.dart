@@ -21,6 +21,8 @@ typedef _WriteDart = int Function(int, Pointer<Uint8>, int);
 typedef _CloseC = Int32 Function(Int32);
 typedef _CloseDart = int Function(int);
 
+typedef _ErrnoC = Pointer<Int32> Function();
+
 final DynamicLibrary _libc = DynamicLibrary.process();
 final _SocketDart _socket =
     _libc.lookupFunction<_SocketC, _SocketDart>('socket');
@@ -29,11 +31,27 @@ final _ConnectDart _connect =
 final _ReadDart _read = _libc.lookupFunction<_ReadC, _ReadDart>('read');
 final _WriteDart _write = _libc.lookupFunction<_WriteC, _WriteDart>('write');
 final _CloseDart _close = _libc.lookupFunction<_CloseC, _CloseDart>('close');
+final _ErrnoC _errnoLocation =
+    _libc.lookupFunction<_ErrnoC, _ErrnoC>('__errno_location');
+
+int get _errno => _errnoLocation().value;
+
+/// Friendly explanation for the errno values RFCOMM connect tends to return.
+String _explainErrno(int errno) => switch (errno) {
+      111 => 'the EV3 refused the connection (ECONNREFUSED)',
+      112 => 'the EV3 is down or asleep (EHOSTDOWN)',
+      113 => "the EV3 couldn't be reached (EHOSTUNREACH)",
+      110 => 'the connection timed out (ETIMEDOUT)',
+      115 => 'the connection is still in progress (EINPROGRESS)',
+      16 => 'the Bluetooth adapter is busy (EBUSY)',
+      _ => 'errno $errno',
+    };
 
 const int _afBluetooth = 31;
 const int _sockStream = 1;
 const int _btprotoRfcomm = 3;
 const int _sockaddrRcSize = 10; // u16 family + 6-byte bdaddr + u8 channel (+pad)
+const int _econnrefused = 111;
 
 /// RFCOMM connection to the EV3 from a Linux desktop. The blocking
 /// connect runs in [Isolate.run]; a dedicated reader isolate streams
@@ -67,35 +85,51 @@ class LinuxRfcommTransport implements Ev3Transport {
     });
   }
 
-  static int _connectBlocking(String address, int channel) {
+  static int _connectBlocking(String address, int preferredChannel) {
     final parts =
         address.split(':').map((p) => int.parse(p, radix: 16)).toList();
     if (parts.length != 6) {
       throw FormatException('Bad Bluetooth address: $address');
     }
-    final fd = _socket(_afBluetooth, _sockStream, _btprotoRfcomm);
-    if (fd < 0) {
-      throw const SocketException(
-          'Could not create a Bluetooth socket (is Bluetooth on?)');
-    }
-    final addr = calloc<Uint8>(_sockaddrRcSize);
-    try {
-      addr[0] = _afBluetooth; // sa_family, little-endian u16
-      addr[1] = 0;
-      for (var i = 0; i < 6; i++) {
-        addr[2 + i] = parts[5 - i]; // bdaddr_t is reversed byte order
+
+    // Try the preferred RFCOMM channel first, then scan the low channels:
+    // the EV3's Serial Port service isn't always on channel 1. A refusal
+    // (ECONNREFUSED) means "reachable, but nothing listening there" → try
+    // the next channel; any other error means the brick itself is
+    // unreachable, so stop and report it.
+    final channels = <int>[
+      preferredChannel,
+      for (var c = 1; c <= 12; c++)
+        if (c != preferredChannel) c,
+    ];
+    var lastErrno = 0;
+    for (final channel in channels) {
+      final fd = _socket(_afBluetooth, _sockStream, _btprotoRfcomm);
+      if (fd < 0) {
+        throw SocketException(
+            'Could not create a Bluetooth socket (${_explainErrno(_errno)}) '
+            '— is Bluetooth on?');
       }
-      addr[8] = channel;
-      final result = _connect(fd, addr, _sockaddrRcSize);
-      if (result != 0) {
-        _close(fd);
-        throw const SocketException(
-            'Could not reach the EV3 — is it on and paired?');
+      final addr = calloc<Uint8>(_sockaddrRcSize);
+      try {
+        addr[0] = _afBluetooth; // sa_family, little-endian u16
+        addr[1] = 0;
+        for (var i = 0; i < 6; i++) {
+          addr[2 + i] = parts[5 - i]; // bdaddr_t is reversed byte order
+        }
+        addr[8] = channel;
+        if (_connect(fd, addr, _sockaddrRcSize) == 0) return fd;
+        lastErrno = _errno;
+      } finally {
+        calloc.free(addr);
       }
-      return fd;
-    } finally {
-      calloc.free(addr);
+      _close(fd);
+      if (lastErrno != _econnrefused) break; // unreachable → stop scanning
     }
+    throw SocketException(
+        'Could not reach the EV3 at $address — ${_explainErrno(lastErrno)}. '
+        'Make sure it is on and in range, and turn it OFF in your computer\'s '
+        'Bluetooth settings so it stops grabbing the connection.');
   }
 
   static void _readLoop(List<Object> args) {

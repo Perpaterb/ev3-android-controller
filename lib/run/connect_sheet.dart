@@ -1,3 +1,5 @@
+import 'dart:io' show SocketException;
+
 import 'package:flutter/material.dart';
 
 import '../services/brick_connection.dart';
@@ -77,10 +79,13 @@ class _DeviceListState extends State<_DeviceList> {
       navigator.pop();
       messenger.showSnackBar(
           SnackBar(content: Text('Connected to ${device.name}!')));
-    } catch (_) {
+    } catch (e) {
+      // Surface the real reason (errno text from the transport) so a failed
+      // connection can actually be diagnosed.
+      final detail = e is SocketException ? e.message : '$e';
       messenger.showSnackBar(SnackBar(
-        content: Text(
-            "Couldn't connect to ${device.name} — is it on and in range?"),
+        duration: const Duration(seconds: 6),
+        content: Text("Couldn't connect to ${device.name}: $detail"),
       ));
     }
   }
