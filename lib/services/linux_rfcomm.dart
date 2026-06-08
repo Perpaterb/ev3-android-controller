@@ -52,6 +52,7 @@ const int _sockStream = 1;
 const int _btprotoRfcomm = 3;
 const int _sockaddrRcSize = 10; // u16 family + 6-byte bdaddr + u8 channel (+pad)
 const int _econnrefused = 111;
+const int _eintr = 4; // interrupted syscall — retry, don't give up
 
 /// RFCOMM connection to the EV3 from a Linux desktop. The blocking
 /// connect runs in [Isolate.run]; a dedicated reader isolate streams
@@ -118,8 +119,14 @@ class LinuxRfcommTransport implements Ev3Transport {
           addr[2 + i] = parts[5 - i]; // bdaddr_t is reversed byte order
         }
         addr[8] = channel;
-        if (_connect(fd, addr, _sockaddrRcSize) == 0) return fd;
-        lastErrno = _errno;
+        // Dart isolates take VM signals (GC, timers) that interrupt blocking
+        // syscalls with EINTR before connect() even completes — just retry.
+        int result;
+        do {
+          result = _connect(fd, addr, _sockaddrRcSize);
+          lastErrno = result == 0 ? 0 : _errno;
+        } while (result != 0 && lastErrno == _eintr);
+        if (result == 0) return fd;
       } finally {
         calloc.free(addr);
       }
@@ -139,8 +146,9 @@ class LinuxRfcommTransport implements Ev3Transport {
     try {
       while (true) {
         final n = _read(fd, buffer, 1024);
+        if (n < 0 && _errno == _eintr) continue; // interrupted — read again
         if (n <= 0) {
-          sendPort.send(null);
+          sendPort.send(null); // real EOF / error → connection dropped
           break;
         }
         sendPort.send(Uint8List.fromList(buffer.asTypedList(n)));
@@ -157,7 +165,16 @@ class LinuxRfcommTransport implements Ev3Transport {
     final pointer = calloc<Uint8>(bytes.length);
     try {
       pointer.asTypedList(bytes.length).setAll(0, bytes);
-      _write(fd, pointer, bytes.length);
+      // Write the whole buffer, retrying on EINTR and short writes.
+      var sent = 0;
+      while (sent < bytes.length) {
+        final n = _write(fd, pointer + sent, bytes.length - sent);
+        if (n < 0) {
+          if (_errno == _eintr) continue;
+          break; // the connection is gone; the reader will report it
+        }
+        sent += n;
+      }
     } finally {
       calloc.free(pointer);
     }
