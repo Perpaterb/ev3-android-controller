@@ -113,7 +113,7 @@ const List<NodeDef> nodeCatalog = [
     inputs: [PinSpec('reset', 'Reset', PinType.power)],
     outputs: [PinSpec('then', 'Then', PinType.power)],
   ),
-  // Sensors
+  // Sensors — EV3
   NodeDef(
     id: 'sensor.touch',
     title: 'Touch Sensor',
@@ -122,11 +122,61 @@ const List<NodeDef> nodeCatalog = [
     outputs: [PinSpec('pressed', 'Pressed?', PinType.boolean)],
   ),
   NodeDef(
-    id: 'sensor.distance',
-    title: 'Distance Sensor',
+    id: 'sensor.colour',
+    title: 'Colour Sensor',
     category: NodeCategory.sensor,
     configKind: NodeConfigKind.sensorPort,
-    outputs: [PinSpec('distance', 'Distance', PinType.integer)],
+    outputs: [
+      PinSpec('colour', 'Colour (0-7)', PinType.integer),
+      PinSpec('reflected', 'Reflected light', PinType.integer),
+      PinSpec('ambient', 'Ambient light', PinType.integer),
+    ],
+  ),
+  NodeDef(
+    id: 'sensor.distance', // kept id for save-compat; was "Distance Sensor"
+    title: 'Ultrasonic Sensor',
+    category: NodeCategory.sensor,
+    configKind: NodeConfigKind.sensorPort,
+    outputs: [PinSpec('distance', 'Distance (cm)', PinType.integer)],
+  ),
+  NodeDef(
+    id: 'sensor.gyro',
+    title: 'Gyro Sensor',
+    category: NodeCategory.sensor,
+    configKind: NodeConfigKind.sensorPort,
+    outputs: [
+      PinSpec('angle', 'Angle', PinType.integer),
+      PinSpec('rate', 'Turn rate', PinType.integer),
+    ],
+  ),
+  NodeDef(
+    id: 'sensor.infrared',
+    title: 'Infrared Sensor',
+    category: NodeCategory.sensor,
+    configKind: NodeConfigKind.sensorPort,
+    outputs: [
+      PinSpec('distance', 'Distance', PinType.integer),
+      PinSpec('heading', 'Beacon heading', PinType.integer),
+      PinSpec('beacon', 'Beacon distance', PinType.integer),
+    ],
+  ),
+  // Sensors — NXT
+  NodeDef(
+    id: 'sensor.sound',
+    title: 'Sound Sensor (NXT)',
+    category: NodeCategory.sensor,
+    configKind: NodeConfigKind.sensorPort,
+    outputs: [PinSpec('level', 'Loudness', PinType.integer)],
+  ),
+  NodeDef(
+    id: 'sensor.light',
+    title: 'Light Sensor (NXT)',
+    category: NodeCategory.sensor,
+    configKind: NodeConfigKind.sensorPort,
+    outputs: [
+      PinSpec('reflected', 'Reflected light', PinType.integer),
+      PinSpec('ambient', 'Ambient light', PinType.integer),
+    ],
   ),
   // Math
   NodeDef(

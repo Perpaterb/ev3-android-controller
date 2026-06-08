@@ -41,12 +41,11 @@ class BluetoothEv3Brick extends ChangeNotifier implements Ev3Brick {
   /// Reply handlers keyed by message counter.
   final Map<int, void Function(Ev3Reply)> _pending = {};
 
-  // Sensor caches and which ports run mode actually asked about.
-  final Map<int, bool> _touchCache = {};
-  final Map<int, int> _distanceCache = {};
+  // Sensor caches and which (port, reading) pairs run mode actually asked
+  // about, plus motor angle caches.
+  final Map<(int, SensorReading), num> _sensorCache = {};
+  final Set<(int, SensorReading)> _watchedSensors = {};
   final Map<String, int> _angleCache = {};
-  final Set<int> _watchedTouch = {};
-  final Set<int> _watchedDistance = {};
   final Set<String> _watchedAngles = {};
 
   // ---- Ev3Brick ------------------------------------------------------------
@@ -82,15 +81,9 @@ class BluetoothEv3Brick extends ChangeNotifier implements Ev3Brick {
   }
 
   @override
-  bool touchPressed(int port) {
-    _watchedTouch.add(port);
-    return _touchCache[port] ?? false;
-  }
-
-  @override
-  int distance(int port) {
-    _watchedDistance.add(port);
-    return _distanceCache[port] ?? 255;
+  num readSensor(int port, SensorReading reading) {
+    _watchedSensors.add((port, reading));
+    return _sensorCache[(port, reading)] ?? reading.resting;
   }
 
   @override
@@ -105,22 +98,16 @@ class BluetoothEv3Brick extends ChangeNotifier implements Ev3Brick {
   /// timer; public so tests can drive it deterministically.
   void pollSensors() {
     if (_failed || _pending.length > 16) return; // brick stopped answering
-    // `changed` compares against the same defaults the getters return, so
+    // `changed` compares against the resting default the getter returns, so
     // the first reply only notifies when it differs from what callers saw.
-    for (final port in _watchedTouch) {
-      _request(Ev3Commands.readSensorSi(_nextCounter(), port, mode: 0),
-          (reply) {
-        final pressed = reply.float32 > 0.5;
-        _updateCache(() => _touchCache[port] = pressed,
-            changed: (_touchCache[port] ?? false) != pressed);
-      });
-    }
-    for (final port in _watchedDistance) {
-      _request(Ev3Commands.readSensorSi(_nextCounter(), port, mode: 0),
-          (reply) {
-        final cm = reply.float32.round();
-        _updateCache(() => _distanceCache[port] = cm,
-            changed: (_distanceCache[port] ?? 255) != cm);
+    for (final key in _watchedSensors) {
+      final (port, reading) = key;
+      _request(
+          Ev3Commands.readSensorSi(_nextCounter(), port,
+              mode: reading.ev3Mode), (reply) {
+        final value = reply.float32.round();
+        _updateCache(() => _sensorCache[key] = value,
+            changed: (_sensorCache[key] ?? reading.resting) != value);
       });
     }
     for (final port in _watchedAngles) {

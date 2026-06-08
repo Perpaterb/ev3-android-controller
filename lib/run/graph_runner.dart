@@ -380,10 +380,8 @@ class GraphRunner extends ChangeNotifier {
         'logic.nimply' => flag('a', false) && !flag('b', false),
         'flow.doN' => _doNCount[node.id] ?? 0,
         'motor.run' => brick.motorAngle(node.config['port'] as String? ?? 'A'),
-        'sensor.touch' =>
-          brick.touchPressed(_portNumber(node.config['port'])),
-        'sensor.distance' =>
-          brick.distance(_portNumber(node.config['port'])),
+        _ when node.defId.startsWith('sensor.') =>
+          _readSensorPin(node, output.pinId),
         _ => null,
       };
     } finally {
@@ -412,6 +410,31 @@ class GraphRunner extends ChangeNotifier {
       }
     }
     return _nodeState[node.id] as String? ?? '0';
+  }
+
+  /// Maps a sensor node's output pin to a brick reading. Returns a bool for
+  /// the touch pin, an int otherwise.
+  Object? _readSensorPin(GraphNode node, String pinId) {
+    final port = _portNumber(node.config['port']);
+    final reading = switch ('${node.defId}.$pinId') {
+      'sensor.touch.pressed' => SensorReading.touch,
+      'sensor.colour.colour' => SensorReading.colourId,
+      'sensor.colour.reflected' => SensorReading.reflectedLight,
+      'sensor.colour.ambient' => SensorReading.ambientLight,
+      'sensor.distance.distance' => SensorReading.distanceCm,
+      'sensor.gyro.angle' => SensorReading.gyroAngle,
+      'sensor.gyro.rate' => SensorReading.gyroRate,
+      'sensor.infrared.distance' => SensorReading.irProximity,
+      'sensor.infrared.heading' => SensorReading.beaconHeading,
+      'sensor.infrared.beacon' => SensorReading.beaconDistance,
+      'sensor.sound.level' => SensorReading.soundLevel,
+      'sensor.light.reflected' => SensorReading.nxtLightReflected,
+      'sensor.light.ambient' => SensorReading.nxtLightAmbient,
+      _ => null,
+    };
+    if (reading == null) return null;
+    final value = brick.readSensor(port, reading);
+    return reading == SensorReading.touch ? value > 0.5 : value.round();
   }
 
   Object? _evalControllerPin(String pinId) {

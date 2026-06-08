@@ -233,9 +233,9 @@ void main() {
     wire(not.id, 'result', kControllerNodeId, '${near.id}.on');
 
     final r = runner();
-    brick.distanceValues[2] = 80;
+    brick.setSensor(2, SensorReading.distanceCm, 80);
     expect(r.lightOn(near.id), isFalse);
-    brick.distanceValues[2] = 20;
+    brick.setSensor(2, SensorReading.distanceCm, 20);
     expect(r.lightOn(near.id), isTrue);
   });
 
@@ -336,6 +336,51 @@ void main() {
     ]);
   });
 
+  test('every sensor output reads its brick value', () {
+    final lamp = addControl(ControlKind.light, 'L'); // unused, just a control
+    syncController();
+    expect(lamp.id, isNotEmpty);
+
+    // Each (node, pin, reading) round-trips an injected value.
+    final cases = <(String, String, SensorReading, int)>[
+      ('sensor.colour', 'colour', SensorReading.colourId, 4),
+      ('sensor.colour', 'reflected', SensorReading.reflectedLight, 60),
+      ('sensor.colour', 'ambient', SensorReading.ambientLight, 12),
+      ('sensor.distance', 'distance', SensorReading.distanceCm, 33),
+      ('sensor.gyro', 'angle', SensorReading.gyroAngle, -90),
+      ('sensor.gyro', 'rate', SensorReading.gyroRate, 15),
+      ('sensor.infrared', 'distance', SensorReading.irProximity, 70),
+      ('sensor.infrared', 'heading', SensorReading.beaconHeading, -5),
+      ('sensor.infrared', 'beacon', SensorReading.beaconDistance, 40),
+      ('sensor.sound', 'level', SensorReading.soundLevel, 55),
+      ('sensor.light', 'reflected', SensorReading.nxtLightReflected, 80),
+      ('sensor.light', 'ambient', SensorReading.nxtLightAmbient, 20),
+    ];
+    for (final (defId, pin, reading, value) in cases) {
+      final readout = addControl(ControlKind.display, '$defId.$pin');
+      syncController();
+      final sensor = node(defId, {'port': '2'});
+      final toText = node('text.fromInt');
+      wire(sensor.id, pin, toText.id, 'number');
+      wire(toText.id, 'result', kControllerNodeId, '${readout.id}.value');
+      brick.setSensor(2, reading, value);
+      expect(runner().displayValue(readout.id), '$value',
+          reason: '$defId.$pin should read $value');
+    }
+  });
+
+  test('a touch sensor reads pressed as a boolean', () {
+    final bump = addControl(ControlKind.light, 'Bump');
+    syncController();
+    final touch = node('sensor.touch', {'port': '4'});
+    wire(touch.id, 'pressed', kControllerNodeId, '${bump.id}.on');
+
+    final r = runner();
+    expect(r.lightOn(bump.id), isFalse);
+    brick.setSensor(4, SensorReading.touch, 1);
+    expect(r.lightOn(bump.id), isTrue);
+  });
+
   test('a touch sensor drives a light', () {
     final bump = addControl(ControlKind.light, 'Bump');
     syncController();
@@ -344,7 +389,7 @@ void main() {
 
     final r = runner();
     expect(r.lightOn(bump.id), isFalse);
-    brick.touchValues[1] = true;
+    brick.setSensor(1, SensorReading.touch, 1);
     expect(r.lightOn(bump.id), isTrue);
   });
 
@@ -374,7 +419,7 @@ void main() {
     wire(convert.id, 'result', append.id, 'b');
     wire(append.id, 'result', kControllerNodeId, '${readout.id}.value');
 
-    brick.distanceValues[3] = 40;
+    brick.setSensor(3, SensorReading.distanceCm, 40);
     expect(runner().displayValue(readout.id), 'Distance: 40');
   });
 
@@ -484,8 +529,7 @@ void main() {
     final r = runner();
     var notified = 0;
     r.addListener(() => notified++);
-    brick.touchValues[1] = true;
-    brick.notifyListeners(); // what a sensor cache update does
+    brick.setSensor(1, SensorReading.touch, 1); // notifies, like a poll update
     expect(notified, 1);
   });
 

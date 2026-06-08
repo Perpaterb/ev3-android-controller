@@ -1,5 +1,34 @@
 import 'package:flutter/foundation.dart';
 
+/// Every kind of value a sensor can report, with the EV3 input *mode* it maps
+/// to and a friendly resting value for the practice mock.
+///
+/// (The EV3 mode numbers follow the LEGO firmware; they may need tuning
+/// against real hardware, which hasn't been wired up yet.)
+enum SensorReading {
+  touch(0, 0), // 0/1 pressed
+  reflectedLight(0, 0), // colour sensor reflected, 0-100
+  ambientLight(1, 0), // colour sensor ambient, 0-100
+  colourId(2, 0), // colour sensor colour, 0-7
+  distanceCm(0, 255), // ultrasonic distance
+  gyroAngle(0, 0),
+  gyroRate(1, 0),
+  irProximity(0, 100), // IR proximity 0-100
+  beaconHeading(1, 0), // IR beacon heading, -25..25
+  beaconDistance(1, 100), // IR beacon distance, 0-100
+  soundLevel(0, 0), // NXT sound, 0-100
+  nxtLightReflected(0, 0), // NXT light reflected
+  nxtLightAmbient(1, 0); // NXT light ambient
+
+  const SensorReading(this.ev3Mode, this.resting);
+
+  /// EV3 input mode index for this reading.
+  final int ev3Mode;
+
+  /// Default value when nothing has been read yet.
+  final int resting;
+}
+
 /// What the app needs from an EV3 brick. Run mode drives this; the real
 /// Bluetooth implementation (Epic 2) and the practice-mode mock both
 /// implement it.
@@ -21,11 +50,8 @@ abstract class Ev3Brick {
 
   int motorAngle(String port);
 
-  /// [port] is an input port 1-4.
-  bool touchPressed(int port);
-
-  /// Distance reading in centimetres.
-  int distance(int port);
+  /// Reads one value from the sensor on input [port] (1-4).
+  num readSensor(int port, SensorReading reading);
 }
 
 /// Practice-mode brick: logs every command instead of sending it, and lets
@@ -40,8 +66,21 @@ class MockEv3Brick extends ChangeNotifier implements Ev3Brick {
   final List<String> log = [];
 
   final Map<String, int> motorAngles = {};
-  final Map<int, bool> touchValues = {};
-  final Map<int, int> distanceValues = {};
+
+  /// Injected sensor readings, keyed by (port, reading). Tests and a future
+  /// simulator write here; unset readings fall back to the reading's resting
+  /// value.
+  final Map<(int, SensorReading), num> sensors = {};
+
+  /// Convenience for tests: set a sensor reading.
+  void setSensor(int port, SensorReading reading, num value) {
+    sensors[(port, reading)] = value;
+    notifyListeners();
+  }
+
+  @override
+  num readSensor(int port, SensorReading reading) =>
+      sensors[(port, reading)] ?? reading.resting;
 
   /// Running motors → signed speed (negative = backward). Drives the sim.
   final Map<String, int> _runningMotors = {};
@@ -122,10 +161,4 @@ class MockEv3Brick extends ChangeNotifier implements Ev3Brick {
 
   @override
   int motorAngle(String port) => motorAngles[port] ?? 0;
-
-  @override
-  bool touchPressed(int port) => touchValues[port] ?? false;
-
-  @override
-  int distance(int port) => distanceValues[port] ?? 255;
 }

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:ev3_controller/services/bluetooth_ev3_brick.dart';
+import 'package:ev3_controller/services/ev3_brick.dart';
 import 'package:ev3_controller/services/ev3_protocol.dart';
 import 'package:ev3_controller/services/ev3_transport.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -79,7 +80,8 @@ void main() {
   });
 
   test('touch reads are cached and refreshed by polling', () async {
-    expect(brick.touchPressed(1), isFalse); // marks port 1 watched
+    // marks (port 1, touch) watched
+    expect(brick.readSensor(1, SensorReading.touch), 0);
 
     brick.pollSensors();
     expect(transport.written, hasLength(1));
@@ -88,15 +90,15 @@ void main() {
     var notified = false;
     brick.addListener(() => notified = true);
     await transport.reply(float32Bytes(1.0)); // pressed
-    expect(brick.touchPressed(1), isTrue);
+    expect(brick.readSensor(1, SensorReading.touch), 1);
     expect(notified, isTrue);
   });
 
   test('distance reads round the SI value to centimetres', () async {
-    expect(brick.distance(2), 255); // default before any reply
+    expect(brick.readSensor(2, SensorReading.distanceCm), 255); // default
     brick.pollSensors();
     await transport.reply(float32Bytes(57.4));
-    expect(brick.distance(2), 57);
+    expect(brick.readSensor(2, SensorReading.distanceCm), 57);
   });
 
   test('motor angle reads the tacho count', () async {
@@ -110,7 +112,7 @@ void main() {
   });
 
   test('unchanged sensor values do not notify', () async {
-    brick.touchPressed(1);
+    brick.readSensor(1, SensorReading.touch);
     var notifications = 0;
     brick.addListener(() => notifications++);
 
