@@ -284,15 +284,26 @@ void main() {
     }
   });
 
-  test('xor and same logic gates', () {
+  test('every two-input logic gate', () {
     final lamp = addControl(ControlKind.light, 'Lamp');
     syncController();
 
     for (final (defId, a, b, expected) in [
+      ('logic.and', true, false, false),
+      ('logic.or', true, false, true),
       ('logic.xor', true, false, true),
       ('logic.xor', true, true, false),
-      ('logic.same', true, true, true),
+      ('logic.same', false, false, true), // matches even when both false
       ('logic.same', true, false, false),
+      ('logic.nand', true, true, false),
+      ('logic.nand', true, false, true),
+      ('logic.nor', false, false, true),
+      ('logic.nor', true, false, false),
+      ('logic.imply', true, false, false), // A but not B → fails the promise
+      ('logic.imply', false, false, true), // A false → promise holds
+      ('logic.imply', true, true, true),
+      ('logic.nimply', true, false, true),
+      ('logic.nimply', true, true, false),
     ]) {
       final gate = node(defId);
       final left = node('value.bool', {'value': a});

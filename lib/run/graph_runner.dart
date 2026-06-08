@@ -261,6 +261,10 @@ class GraphRunner extends ChangeNotifier {
         'logic.not' => !flag('value', false),
         'logic.xor' => flag('a', false) != flag('b', false),
         'logic.same' => flag('a', false) == flag('b', false),
+        'logic.nand' => !(flag('a', false) && flag('b', false)),
+        'logic.nor' => !(flag('a', false) || flag('b', false)),
+        'logic.imply' => !flag('a', false) || flag('b', false),
+        'logic.nimply' => flag('a', false) && !flag('b', false),
         'motor.run' => brick.motorAngle(node.config['port'] as String? ?? 'A'),
         'sensor.touch' =>
           brick.touchPressed(_portNumber(node.config['port'])),

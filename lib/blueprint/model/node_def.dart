@@ -219,6 +219,46 @@ const List<NodeDef> nodeCatalog = [
     ],
     outputs: [PinSpec('result', 'A = B', PinType.boolean)],
   ),
+  NodeDef(
+    id: 'logic.nand',
+    title: 'Not Both? (NAND)',
+    category: NodeCategory.logic,
+    inputs: [
+      PinSpec('a', 'A', PinType.boolean),
+      PinSpec('b', 'B', PinType.boolean),
+    ],
+    outputs: [PinSpec('result', 'Not both', PinType.boolean)],
+  ),
+  NodeDef(
+    id: 'logic.nor',
+    title: 'Neither? (NOR)',
+    category: NodeCategory.logic,
+    inputs: [
+      PinSpec('a', 'A', PinType.boolean),
+      PinSpec('b', 'B', PinType.boolean),
+    ],
+    outputs: [PinSpec('result', 'Neither', PinType.boolean)],
+  ),
+  NodeDef(
+    id: 'logic.imply',
+    title: 'If A then B? (IMPLY)',
+    category: NodeCategory.logic,
+    inputs: [
+      PinSpec('a', 'A', PinType.boolean),
+      PinSpec('b', 'B', PinType.boolean),
+    ],
+    outputs: [PinSpec('result', 'A → B', PinType.boolean)],
+  ),
+  NodeDef(
+    id: 'logic.nimply',
+    title: 'A but not B? (NIMPLY)',
+    category: NodeCategory.logic,
+    inputs: [
+      PinSpec('a', 'A', PinType.boolean),
+      PinSpec('b', 'B', PinType.boolean),
+    ],
+    outputs: [PinSpec('result', 'A and not B', PinType.boolean)],
+  ),
   // Flow
   NodeDef(
     id: 'flow.branch',
