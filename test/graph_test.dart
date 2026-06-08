@@ -118,6 +118,59 @@ void main() {
     expect(graph.wires, hasLength(2));
   });
 
+  group('sequence auto-grow', () {
+    test('wiring the last output grows a fresh one', () {
+      final seq = graph.addNode(def('flow.sequence'), Offset.zero);
+      expect(seq.def.outputs, hasLength(2));
+
+      final motorA = graph.addNode(def('motor.run'), Offset.zero);
+      graph.connect(PinRef(seq.id, 'then1', isOutput: true),
+          PinRef(motorA.id, 'run', isOutput: false));
+      expect(seq.def.outputs, hasLength(2)); // then2 still free
+
+      final motorB = graph.addNode(def('motor.run'), Offset.zero);
+      graph.connect(PinRef(seq.id, 'then2', isOutput: true),
+          PinRef(motorB.id, 'run', isOutput: false));
+      expect(seq.def.outputs, hasLength(3)); // then3 appeared
+
+      final motorC = graph.addNode(def('motor.run'), Offset.zero);
+      graph.connect(PinRef(seq.id, 'then3', isOutput: true),
+          PinRef(motorC.id, 'run', isOutput: false));
+      expect(seq.def.outputs, hasLength(4)); // and then4
+      expect(seq.def.outputs.last.label, 'Fourth');
+    });
+
+    test('freeing trailing outputs shrinks back, never below two', () {
+      final seq = graph.addNode(def('flow.sequence'), Offset.zero);
+      final motorA = graph.addNode(def('motor.run'), Offset.zero);
+      final motorB = graph.addNode(def('motor.run'), Offset.zero);
+      graph.connect(PinRef(seq.id, 'then1', isOutput: true),
+          PinRef(motorA.id, 'run', isOutput: false));
+      graph.connect(PinRef(seq.id, 'then2', isOutput: true),
+          PinRef(motorB.id, 'run', isOutput: false));
+      expect(seq.def.outputs, hasLength(3));
+
+      graph.disconnectPin(PinRef(seq.id, 'then2', isOutput: true));
+      expect(seq.def.outputs, hasLength(2));
+      graph.disconnectPin(PinRef(seq.id, 'then1', isOutput: true));
+      expect(seq.def.outputs, hasLength(2)); // minimum stays
+    });
+
+    test('grown outputs and their wires survive a JSON reload', () {
+      final seq = graph.addNode(def('flow.sequence'), Offset.zero);
+      final motorA = graph.addNode(def('motor.run'), Offset.zero);
+      final motorB = graph.addNode(def('motor.run'), Offset.zero);
+      graph.connect(PinRef(seq.id, 'then1', isOutput: true),
+          PinRef(motorA.id, 'run', isOutput: false));
+      graph.connect(PinRef(seq.id, 'then2', isOutput: true),
+          PinRef(motorB.id, 'run', isOutput: false));
+
+      final copy = BlueprintGraph.fromJson(graph.toJson());
+      expect(copy.node(seq.id)!.def.outputs, hasLength(3));
+      expect(copy.wires, hasLength(2));
+    });
+  });
+
   test('removeNode cascades its wires', () {
     final number = graph.addNode(def('value.int'), Offset.zero);
     final add = graph.addNode(def('math.add'), Offset.zero);

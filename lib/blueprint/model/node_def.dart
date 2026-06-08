@@ -159,6 +159,18 @@ const List<NodeDef> nodeCatalog = [
     ],
     outputs: [PinSpec('result', 'A = B', PinType.boolean)],
   ),
+  // Jitter-friendly equality: true when A is within ± the tolerance of B.
+  NodeDef(
+    id: 'math.near',
+    title: 'Is Close To?',
+    category: NodeCategory.math,
+    inputs: [
+      PinSpec('a', 'A', PinType.integer),
+      PinSpec('b', 'B', PinType.integer),
+      PinSpec('within', 'Within ±', PinType.integer),
+    ],
+    outputs: [PinSpec('result', 'A ≈ B', PinType.boolean)],
+  ),
   // Logic
   NodeDef(
     id: 'logic.and',
@@ -186,6 +198,26 @@ const List<NodeDef> nodeCatalog = [
     category: NodeCategory.logic,
     inputs: [PinSpec('value', 'Value', PinType.boolean)],
     outputs: [PinSpec('result', 'Opposite', PinType.boolean)],
+  ),
+  NodeDef(
+    id: 'logic.xor',
+    title: 'Different?',
+    category: NodeCategory.logic,
+    inputs: [
+      PinSpec('a', 'A', PinType.boolean),
+      PinSpec('b', 'B', PinType.boolean),
+    ],
+    outputs: [PinSpec('result', 'A ≠ B', PinType.boolean)],
+  ),
+  NodeDef(
+    id: 'logic.same',
+    title: 'Same?',
+    category: NodeCategory.logic,
+    inputs: [
+      PinSpec('a', 'A', PinType.boolean),
+      PinSpec('b', 'B', PinType.boolean),
+    ],
+    outputs: [PinSpec('result', 'A = B', PinType.boolean)],
   ),
   // Flow
   NodeDef(
@@ -286,3 +318,27 @@ final Map<String, NodeDef> _defIndex = {
 };
 
 NodeDef? nodeDefById(String id) => _defIndex[id];
+
+String _ordinal(int i) => switch (i) {
+      1 => 'First',
+      2 => 'Second',
+      3 => 'Third',
+      4 => 'Fourth',
+      5 => 'Fifth',
+      6 => 'Sixth',
+      _ => 'Step $i',
+    };
+
+/// A Sequence definition with [outs] power outputs. Sequence nodes grow a
+/// fresh output whenever the last one gets wired (and shrink back when
+/// trailing outputs are freed), so there's always a spare to plug into.
+NodeDef sequenceDef(int outs) => NodeDef(
+      id: 'flow.sequence',
+      title: 'Sequence',
+      category: NodeCategory.flow,
+      inputs: const [PinSpec('exec', 'Do', PinType.power)],
+      outputs: [
+        for (var i = 1; i <= outs; i++)
+          PinSpec('then$i', _ordinal(i), PinType.power),
+      ],
+    );

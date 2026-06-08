@@ -262,6 +262,69 @@ void main() {
     }
   });
 
+  test('is close to: true within the tolerance, default ±5', () {
+    final lamp = addControl(ControlKind.light, 'Lamp');
+    syncController();
+
+    for (final (a, b, within, expected) in [
+      (50, 53, 5, true),
+      (50, 56, 5, false),
+      (50, 70, 25, true),
+    ]) {
+      final near = node('math.near');
+      final left = node('value.int', {'value': a});
+      final right = node('value.int', {'value': b});
+      final tol = node('value.int', {'value': within});
+      wire(left.id, 'value', near.id, 'a');
+      wire(right.id, 'value', near.id, 'b');
+      wire(tol.id, 'value', near.id, 'within');
+      wire(near.id, 'result', kControllerNodeId, '${lamp.id}.on');
+      expect(runner().lightOn(lamp.id), expected,
+          reason: '|$a - $b| <= $within should be $expected');
+    }
+  });
+
+  test('xor and same logic gates', () {
+    final lamp = addControl(ControlKind.light, 'Lamp');
+    syncController();
+
+    for (final (defId, a, b, expected) in [
+      ('logic.xor', true, false, true),
+      ('logic.xor', true, true, false),
+      ('logic.same', true, true, true),
+      ('logic.same', true, false, false),
+    ]) {
+      final gate = node(defId);
+      final left = node('value.bool', {'value': a});
+      final right = node('value.bool', {'value': b});
+      wire(left.id, 'value', gate.id, 'a');
+      wire(right.id, 'value', gate.id, 'b');
+      wire(gate.id, 'result', kControllerNodeId, '${lamp.id}.on');
+      expect(runner().lightOn(lamp.id), expected,
+          reason: '$defId($a, $b) should be $expected');
+    }
+  });
+
+  test('a grown sequence fires all its outputs in order', () {
+    final go = addControl(ControlKind.button, 'Go');
+    syncController();
+    final seq = node('flow.sequence');
+    final first = node('motor.run', {'port': 'A'});
+    final second = node('motor.run', {'port': 'B'});
+    final third = node('motor.run', {'port': 'C'});
+    wire(kControllerNodeId, '${go.id}.pressed', seq.id, 'exec');
+    wire(seq.id, 'then1', first.id, 'run');
+    wire(seq.id, 'then2', second.id, 'run');
+    wire(seq.id, 'then3', third.id, 'run'); // exists because then2 is wired
+
+    runner().buttonPressed(go.id);
+    expect(brick.log, [
+      'Motor A: run at 100% forward',
+      'Motor B: run at 100% forward',
+      'Motor C: run at 100% forward',
+    ]);
+  });
+
   test('a touch sensor drives a light', () {
     final bump = addControl(ControlKind.light, 'Bump');
     syncController();

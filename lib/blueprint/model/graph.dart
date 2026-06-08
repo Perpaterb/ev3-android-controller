@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
@@ -148,6 +149,7 @@ class BlueprintGraph extends ChangeNotifier {
     if (id == kControllerNodeId) return; // the controller can't be deleted
     if (_nodes.remove(id) == null) return;
     _wires.removeWhere((w) => w.fromNode == id || w.toNode == id);
+    _refreshSequenceNodes();
     notifyListeners();
   }
 
@@ -224,8 +226,29 @@ class BlueprintGraph extends ChangeNotifier {
       toNode: input.nodeId,
       toPin: input.pinId,
     ));
+    _refreshSequenceNodes();
     notifyListeners();
     return true;
+  }
+
+  /// Sequence nodes always keep one spare output: wiring the last `then`
+  /// grows a new one; freeing trailing ones shrinks back (never below 2).
+  void _refreshSequenceNodes() {
+    for (final node in _nodes.values) {
+      if (node.defId != 'flow.sequence') continue;
+      var highestWired = 0;
+      for (final wire in _wires) {
+        if (wire.fromNode != node.id || !wire.fromPin.startsWith('then')) {
+          continue;
+        }
+        final index = int.tryParse(wire.fromPin.substring(4)) ?? 0;
+        if (index > highestWired) highestWired = index;
+      }
+      final outs = math.max(2, highestWired + 1);
+      if (node.def.outputs.length != outs) {
+        node.dynamicDef = sequenceDef(outs);
+      }
+    }
   }
 
   /// Removes every wire attached to [ref]'s side of the connection.
@@ -234,7 +257,10 @@ class BlueprintGraph extends ChangeNotifier {
     _wires.removeWhere((w) => ref.isOutput
         ? w.fromNode == ref.nodeId && w.fromPin == ref.pinId
         : w.toNode == ref.nodeId && w.toPin == ref.pinId);
-    if (_wires.length != before) notifyListeners();
+    if (_wires.length != before) {
+      _refreshSequenceNodes();
+      notifyListeners();
+    }
   }
 
   Map<String, dynamic> toJson() => {
@@ -264,13 +290,16 @@ class BlueprintGraph extends ChangeNotifier {
       }
       graph._nodes[node.id] = node;
     }
+    // Load all wires first and grow sequence nodes to cover them — a wire
+    // into a grown `then3` is only valid once the def has grown — then drop
+    // any wire that still has a missing endpoint.
     for (final raw in (json['wires'] as List? ?? const [])) {
-      final wire = Wire.fromJson((raw as Map).cast<String, dynamic>());
-      if (graph.pinType(wire.from) != null &&
-          graph.pinType(wire.to) != null) {
-        graph._wires.add(wire);
-      }
+      graph._wires.add(Wire.fromJson((raw as Map).cast<String, dynamic>()));
     }
+    graph._refreshSequenceNodes();
+    graph._wires.removeWhere((w) =>
+        graph.pinType(w.from) == null || graph.pinType(w.to) == null);
+    graph._refreshSequenceNodes();
     return graph;
   }
 }

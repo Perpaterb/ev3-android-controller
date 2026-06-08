@@ -193,8 +193,10 @@ class GraphRunner extends ChangeNotifier {
             ? 'ifTrue'
             : 'ifFalse');
       case 'flow.sequence':
-        fire('then1');
-        fire('then2');
+        // However many outputs it has grown, in order.
+        for (final out in node.def.outputs) {
+          fire(out.id);
+        }
       case 'text.fromPower':
         // A pulse from a non-held source shows as a short blink of "1".
         _nodeState[node.id] = '1';
@@ -252,9 +254,13 @@ class GraphRunner extends ChangeNotifier {
         'math.greater' => input('a', 0) > input('b', 0),
         'math.less' => input('a', 0) < input('b', 0),
         'math.equals' => input('a', 0) == input('b', 0),
+        'math.near' =>
+          (input('a', 0) - input('b', 0)).abs() <= input('within', 5),
         'logic.and' => flag('a', false) && flag('b', false),
         'logic.or' => flag('a', false) || flag('b', false),
         'logic.not' => !flag('value', false),
+        'logic.xor' => flag('a', false) != flag('b', false),
+        'logic.same' => flag('a', false) == flag('b', false),
         'motor.run' => brick.motorAngle(node.config['port'] as String? ?? 'A'),
         'sensor.touch' =>
           brick.touchPressed(_portNumber(node.config['port'])),
