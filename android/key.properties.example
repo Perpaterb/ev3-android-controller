@@ -1,0 +1,9 @@
+# Copy this file to `key.properties` (same folder) and fill in your real
+# values. key.properties is git-ignored and must NEVER be committed.
+#
+# storeFile is the path to the keystore you created with keytool (see
+# BUILD.md). An absolute path is safest, e.g. /home/bob/keys/bricklogic.jks
+storePassword=YOUR_KEYSTORE_PASSWORD
+keyPassword=YOUR_KEY_PASSWORD
+keyAlias=upload
+storeFile=/absolute/path/to/bricklogic-upload.jks

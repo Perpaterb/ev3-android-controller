@@ -33,3 +33,12 @@ migrate_working_dir/
 
 # Local troubleshooting screenshots
 TSImages/
+
+# Release signing — NEVER commit the keystore or its passwords
+android/key.properties
+*.jks
+*.keystore
+
+# Built release artifacts (large binaries; rebuild from a tag instead)
+/releases/*.aab
+/releases/*.apk
