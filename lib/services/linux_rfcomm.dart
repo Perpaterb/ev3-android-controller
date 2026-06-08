@@ -20,8 +20,13 @@ typedef _WriteC = IntPtr Function(Int32, Pointer<Uint8>, IntPtr);
 typedef _WriteDart = int Function(int, Pointer<Uint8>, int);
 typedef _CloseC = Int32 Function(Int32);
 typedef _CloseDart = int Function(int);
-
 typedef _ErrnoC = Pointer<Int32> Function();
+typedef _PollC = Int32 Function(Pointer<Uint8>, Uint64, Int32);
+typedef _PollDart = int Function(Pointer<Uint8>, int, int);
+typedef _GetsockoptC = Int32 Function(
+    Int32, Int32, Int32, Pointer<Int32>, Pointer<Uint32>);
+typedef _GetsockoptDart = int Function(
+    int, int, int, Pointer<Int32>, Pointer<Uint32>);
 
 final DynamicLibrary _libc = DynamicLibrary.process();
 final _SocketDart _socket =
@@ -33,6 +38,9 @@ final _WriteDart _write = _libc.lookupFunction<_WriteC, _WriteDart>('write');
 final _CloseDart _close = _libc.lookupFunction<_CloseC, _CloseDart>('close');
 final _ErrnoC _errnoLocation =
     _libc.lookupFunction<_ErrnoC, _ErrnoC>('__errno_location');
+final _PollDart _poll = _libc.lookupFunction<_PollC, _PollDart>('poll');
+final _GetsockoptDart _getsockopt =
+    _libc.lookupFunction<_GetsockoptC, _GetsockoptDart>('getsockopt');
 
 int get _errno => _errnoLocation().value;
 
@@ -52,7 +60,13 @@ const int _sockStream = 1;
 const int _btprotoRfcomm = 3;
 const int _sockaddrRcSize = 10; // u16 family + 6-byte bdaddr + u8 channel (+pad)
 const int _econnrefused = 111;
-const int _eintr = 4; // interrupted syscall — retry, don't give up
+const int _eintr = 4; // interrupted syscall
+const int _einprogress = 115; // connect in progress; wait via poll
+const int _etimedout = 110;
+const int _pollout = 0x004;
+const int _solSocket = 1;
+const int _soError = 4;
+const int _connectTimeoutMs = 10000;
 
 /// RFCOMM connection to the EV3 from a Linux desktop. The blocking
 /// connect runs in [Isolate.run]; a dedicated reader isolate streams
@@ -119,14 +133,8 @@ class LinuxRfcommTransport implements Ev3Transport {
           addr[2 + i] = parts[5 - i]; // bdaddr_t is reversed byte order
         }
         addr[8] = channel;
-        // Dart isolates take VM signals (GC, timers) that interrupt blocking
-        // syscalls with EINTR before connect() even completes — just retry.
-        int result;
-        do {
-          result = _connect(fd, addr, _sockaddrRcSize);
-          lastErrno = result == 0 ? 0 : _errno;
-        } while (result != 0 && lastErrno == _eintr);
-        if (result == 0) return fd;
+        lastErrno = _connectFd(fd, addr);
+        if (lastErrno == 0) return fd;
       } finally {
         calloc.free(addr);
       }
@@ -137,6 +145,44 @@ class LinuxRfcommTransport implements Ev3Transport {
         'Could not reach the EV3 at $address — ${_explainErrno(lastErrno)}. '
         'Make sure it is on and in range, and turn it OFF in your computer\'s '
         'Bluetooth settings so it stops grabbing the connection.');
+  }
+
+  /// Connects [fd], returning 0 on success or the failing errno. A blocking
+  /// connect interrupted by a VM signal (EINTR) keeps going in the
+  /// background — calling connect() again corrupts the socket, so instead we
+  /// wait for it to finish with poll() and read the real result from
+  /// SO_ERROR. This is the canonical interruptible-connect pattern.
+  static int _connectFd(int fd, Pointer<Uint8> addr) {
+    final result = _connect(fd, addr, _sockaddrRcSize);
+    if (result == 0) return 0;
+    final err = _errno;
+    if (err != _eintr && err != _einprogress) return err;
+
+    // Wait for the in-progress connect to complete (socket becomes writable).
+    final pollfd = calloc<Uint8>(8);
+    final view = pollfd.asTypedList(8).buffer.asByteData();
+    view.setInt32(0, fd, Endian.host); // pollfd.fd
+    view.setInt16(4, _pollout, Endian.host); // pollfd.events
+    try {
+      final ready = _poll(pollfd, 1, _connectTimeoutMs);
+      if (ready == 0) return _etimedout;
+      if (ready < 0) return _errno;
+    } finally {
+      calloc.free(pollfd);
+    }
+
+    // Connect finished — SO_ERROR holds 0 (success) or the real errno.
+    final optval = calloc<Int32>();
+    final optlen = calloc<Uint32>()..value = 4;
+    try {
+      if (_getsockopt(fd, _solSocket, _soError, optval, optlen) != 0) {
+        return _errno;
+      }
+      return optval.value;
+    } finally {
+      calloc.free(optval);
+      calloc.free(optlen);
+    }
   }
 
   static void _readLoop(List<Object> args) {
