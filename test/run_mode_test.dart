@@ -142,6 +142,21 @@ void main() {
     expect(int.parse(shown()), greaterThan(0));
   });
 
+  testWidgets('a slider starts at its default and can hide its value',
+      (tester) async {
+    final speed = addControl(ControlKind.slider, 'Speed');
+    layout.setSliderDefault(speed.id, 50);
+    layout.setControlShowValue(speed.id, false);
+    seed();
+    await pumpRunMode(tester);
+
+    // Value hidden, name still shown.
+    expect(find.text('Speed'), findsOneWidget);
+    expect(find.text('Speed: 50'), findsNothing);
+    final slider = tester.widget<Slider>(find.byType(Slider));
+    expect(slider.value, 50);
+  });
+
   testWidgets('an unwired display shows --', (tester) async {
     addControl(ControlKind.display, 'Readout');
     seed();

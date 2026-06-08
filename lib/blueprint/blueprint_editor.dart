@@ -466,6 +466,21 @@ class _BlueprintEditorState extends State<BlueprintEditor> {
                     setSheetState(() {});
                   },
                 ),
+              if (control.kind == ControlKind.slider)
+                _sheetSlider(
+                  key: const Key('control-slider-default'),
+                  icon: Icons.flag_outlined,
+                  label: 'Start at',
+                  value: control.sliderDefault.toDouble(),
+                  min: control.sliderMin.toDouble(),
+                  max: control.sliderMax.toDouble(),
+                  divisions: control.sliderMax - control.sliderMin,
+                  display: '${control.sliderDefault}',
+                  onChanged: (value) {
+                    _layout.setSliderDefault(control.id, value.round());
+                    setSheetState(() {});
+                  },
+                ),
               SwitchListTile(
                 key: const Key('control-show-name'),
                 secondary: const Icon(Icons.label_outline),
@@ -476,6 +491,17 @@ class _BlueprintEditorState extends State<BlueprintEditor> {
                   setSheetState(() {});
                 },
               ),
+              if (control.kind == ControlKind.slider)
+                SwitchListTile(
+                  key: const Key('control-show-value'),
+                  secondary: const Icon(Icons.onetwothree),
+                  title: const Text('Show value when running'),
+                  value: control.showValue,
+                  onChanged: (value) {
+                    _layout.setControlShowValue(control.id, value);
+                    setSheetState(() {});
+                  },
+                ),
               if (control.capabilities.length > 1) ...[
                 const Padding(
                   padding: EdgeInsets.fromLTRB(16, 8, 16, 0),

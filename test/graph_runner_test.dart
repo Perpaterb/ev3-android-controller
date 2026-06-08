@@ -563,6 +563,13 @@ void main() {
     expect(runner().sliderValue(speed.id), 0);
   });
 
+  test('slider starts at its configured default value', () {
+    final speed = addControl(ControlKind.slider, 'Speed');
+    layout.setSliderDefault(speed.id, 50);
+    syncController();
+    expect(runner().sliderValue(speed.id), 50);
+  });
+
   group('tick model', () {
     test('Every Tick fires power each tick', () {
       final go = addControl(ControlKind.button, 'Go'); // just to have a brick

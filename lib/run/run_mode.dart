@@ -506,19 +506,21 @@ class _RunSlider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final min = (control.config['min'] as num?)?.toDouble() ?? 0;
-    final max = (control.config['max'] as num?)?.toDouble() ?? 100;
+    final min = control.sliderMin.toDouble();
+    final max = control.sliderMax.toDouble();
     final value =
         runner.sliderValue(control.id).toDouble().clamp(min, max);
+    // Caption combines name and/or value per the control's toggles.
+    final label = [
+      if (control.showName) control.name,
+      if (control.showValue) '${value.round()}',
+    ].join(': ');
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Text(
-            control.showName
-                ? '${control.name}: ${value.round()}'
-                : '${value.round()}',
-            overflow: TextOverflow.ellipsis,
-            style: _controlNameStyle),
+        if (label.isNotEmpty)
+          Text(label,
+              overflow: TextOverflow.ellipsis, style: _controlNameStyle),
         Slider(
           key: Key('run-control-${control.id}'),
           min: min,

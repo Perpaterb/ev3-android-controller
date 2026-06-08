@@ -57,6 +57,15 @@ class ControllerControl {
   /// Whether the control's name is drawn on the Run screen.
   bool get showName => config['showName'] != false;
 
+  /// Whether a slider shows its current number on the Run screen.
+  bool get showValue => config['showValue'] != false;
+
+  // Slider range and starting value.
+  int get sliderMin => (config['min'] as num?)?.toInt() ?? 0;
+  int get sliderMax => (config['max'] as num?)?.toInt() ?? 100;
+  int get sliderDefault =>
+      (config['default'] as num?)?.toInt() ?? sliderMin;
+
   /// Capability suffixes the user has switched off, so they make no pin on
   /// the controller node (declutter). e.g. {'isDown', 'released'}.
   Set<String> get hiddenCapabilities =>
@@ -381,6 +390,22 @@ class ControllerLayout extends ChangeNotifier {
     final target = control(id);
     if (target == null) return;
     target.config['showName'] = show;
+    notifyListeners();
+  }
+
+  void setControlShowValue(String id, bool show) {
+    final target = control(id);
+    if (target == null) return;
+    target.config['showValue'] = show;
+    notifyListeners();
+  }
+
+  /// Sets a slider's starting value, clamped to its range.
+  void setSliderDefault(String id, int value) {
+    final target = control(id);
+    if (target == null) return;
+    target.config['default'] =
+        value.clamp(target.sliderMin, target.sliderMax);
     notifyListeners();
   }
 

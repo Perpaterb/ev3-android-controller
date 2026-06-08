@@ -41,8 +41,7 @@ class GraphRunner extends ChangeNotifier {
       for (final control in tab.controls) {
         switch (control.kind) {
           case ControlKind.slider:
-            _controlValues[control.id] =
-                (control.config['min'] as num?)?.toInt() ?? 0;
+            _controlValues[control.id] = control.sliderDefault;
           case ControlKind.toggle:
             _controlValues[control.id] = false;
           default:

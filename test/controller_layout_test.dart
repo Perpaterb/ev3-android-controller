@@ -127,6 +127,28 @@ void main() {
     expect(copy.control(control.id)!.outputPins, hasLength(2));
   });
 
+  test('slider default and show-value persist; default clamps to range', () {
+    final slider = layout.addControl(
+      tabId: layout.tabs.single.id,
+      kind: ControlKind.slider,
+      name: 'Speed',
+      position: const Offset(0.5, 0.5),
+    );
+    expect(slider.sliderDefault, 0); // defaults to min
+    expect(slider.showValue, isTrue);
+
+    layout.setSliderDefault(slider.id, 50);
+    layout.setControlShowValue(slider.id, false);
+    layout.setSliderDefault(slider.id, 999); // clamps to max
+    expect(slider.sliderDefault, 100);
+    layout.setSliderDefault(slider.id, 40);
+
+    final copy = ControllerLayout.fromJson(layout.toJson());
+    final copied = copy.control(slider.id)!;
+    expect(copied.sliderDefault, 40);
+    expect(copied.showValue, isFalse);
+  });
+
   test('showName defaults to true and persists when switched off', () {
     final control = layout.addControl(
       tabId: layout.tabs.single.id,
