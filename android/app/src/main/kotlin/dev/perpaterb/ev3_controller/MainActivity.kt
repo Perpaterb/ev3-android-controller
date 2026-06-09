@@ -92,7 +92,14 @@ class MainActivity : FlutterActivity() {
                 closeConnection()
                 val device = adapter?.getRemoteDevice(address)
                     ?: throw IllegalStateException("Bluetooth is off")
-                adapter?.cancelDiscovery()
+                // Cancelling discovery speeds up the connect, but on Android
+                // 12+ it needs BLUETOOTH_SCAN — which we don't request (we
+                // only use already-paired devices). It's optional, so never
+                // let a missing-permission error abort the connection.
+                try {
+                    adapter?.cancelDiscovery()
+                } catch (_: SecurityException) {
+                }
                 val newSocket = device.createRfcommSocketToServiceRecord(sppUuid)
                 newSocket.connect()
                 socket = newSocket
