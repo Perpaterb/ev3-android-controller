@@ -151,13 +151,22 @@ class GraphRunner extends ChangeNotifier {
 
   bool toggleValue(String controlId) => _controlValues[controlId] == true;
 
-  /// Whether a light control should be lit: evaluates whatever is wired
-  /// into its `on?` input right now.
-  bool lightOn(String controlId) {
-    final wire =
-        _wireInto(PinRef(kControllerNodeId, '$controlId.on', isOutput: false));
-    if (wire == null) return false;
-    return _toBool(_evalOutput(wire.from, {}), false);
+  /// The EV3 colour code (0-7) a light should show, from whatever is wired
+  /// into its `colour` input. 0 = off.
+  int lightColour(String controlId) {
+    final wire = _wireInto(
+        PinRef(kControllerNodeId, '$controlId.colour', isOutput: false));
+    if (wire == null) return 0;
+    return _toInt(_evalOutput(wire.from, {}), 0).clamp(0, 7);
+  }
+
+  /// A light's brightness (0-100). Defaults to full when nothing is wired,
+  /// so setting just a colour lights it up.
+  int lightBrightness(String controlId) {
+    final wire = _wireInto(
+        PinRef(kControllerNodeId, '$controlId.brightness', isOutput: false));
+    if (wire == null) return 100;
+    return _toInt(_evalOutput(wire.from, {}), 100).clamp(0, 100);
   }
 
   /// The text a display control should show: evaluates whatever is wired

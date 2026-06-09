@@ -52,6 +52,18 @@ void main() {
   GraphRunner runner() => GraphRunner(
       graph: graph, layout: layout, brick: brick, variables: variables);
 
+  // Lights no longer take a boolean, so read a bool the graph produces by
+  // routing it through a fresh display via Bool → String.
+  var probeSeq = 0;
+  bool readBool(String fromNode, String fromPin) {
+    final readout = addControl(ControlKind.display, 'probe${probeSeq++}');
+    syncController();
+    final toStr = node('text.fromBool');
+    wire(fromNode, fromPin, toStr.id, 'value');
+    wire(toStr.id, 'result', kControllerNodeId, '${readout.id}.value');
+    return runner().displayValue(readout.id) == 'true';
+  }
+
   test('button press runs a motor with wired speed and direction', () {
     final go = addControl(ControlKind.button, 'Go');
     syncController();
@@ -222,30 +234,35 @@ void main() {
     expect(brick.log.last, 'Motor B: stop');
   });
 
-  test('a light reflects a sensor comparison live', () {
-    final near = addControl(ControlKind.light, 'Near');
+  test('a light shows a colour driven live by a sensor', () {
+    final eye = addControl(ControlKind.light, 'Eye');
     syncController();
-    final sensor = node('sensor.distance', {'port': '2'});
-    final limit = node('value.int', {'value': 50});
-    final greater = node('math.greater');
-    final not = node('logic.not');
-    // light on when distance is NOT greater than 50 (i.e. close)
-    wire(sensor.id, 'distance', greater.id, 'a');
-    wire(limit.id, 'value', greater.id, 'b');
-    wire(greater.id, 'result', not.id, 'value');
-    wire(not.id, 'result', kControllerNodeId, '${near.id}.on');
+    final sensor = node('sensor.colour', {'port': '2'});
+    wire(sensor.id, 'colour', kControllerNodeId, '${eye.id}.colour');
 
     final r = runner();
-    brick.setSensor(2, SensorReading.distanceCm, 80);
-    expect(r.lightOn(near.id), isFalse);
-    brick.setSensor(2, SensorReading.distanceCm, 20);
-    expect(r.lightOn(near.id), isTrue);
+    brick.setSensor(2, SensorReading.colourId, 5); // red
+    expect(r.lightColour(eye.id), 5);
+    brick.setSensor(2, SensorReading.colourId, 3); // green
+    expect(r.lightColour(eye.id), 3);
+    expect(r.lightBrightness(eye.id), 100); // full when unwired
+  });
+
+  test('light colour and brightness read their wired inputs', () {
+    final lamp = addControl(ControlKind.light, 'Lamp');
+    syncController();
+    final colour = node('value.int', {'value': 4}); // yellow
+    final bright = node('value.int', {'value': 30});
+    wire(colour.id, 'value', kControllerNodeId, '${lamp.id}.colour');
+    wire(bright.id, 'value', kControllerNodeId, '${lamp.id}.brightness');
+
+    final r = runner();
+    expect(r.lightColour(lamp.id), 4);
+    expect(r.lightBrightness(lamp.id), 30);
   });
 
   test('comparison nodes: bigger, smaller, equal', () {
-    final lamp = addControl(ControlKind.light, 'Lamp');
     syncController();
-
     for (final (defId, a, b, expected) in [
       ('math.greater', 5, 3, true),
       ('math.greater', 3, 5, false),
@@ -259,16 +276,13 @@ void main() {
       final right = node('value.int', {'value': b});
       wire(left.id, 'value', compare.id, 'a');
       wire(right.id, 'value', compare.id, 'b');
-      wire(compare.id, 'result', kControllerNodeId, '${lamp.id}.on');
-      expect(runner().lightOn(lamp.id), expected,
+      expect(readBool(compare.id, 'result'), expected,
           reason: '$defId($a, $b) should be $expected');
     }
   });
 
   test('is close to: true within the tolerance, default ±5', () {
-    final lamp = addControl(ControlKind.light, 'Lamp');
     syncController();
-
     for (final (a, b, within, expected) in [
       (50, 53, 5, true),
       (50, 56, 5, false),
@@ -281,16 +295,13 @@ void main() {
       wire(left.id, 'value', near.id, 'a');
       wire(right.id, 'value', near.id, 'b');
       wire(tol.id, 'value', near.id, 'within');
-      wire(near.id, 'result', kControllerNodeId, '${lamp.id}.on');
-      expect(runner().lightOn(lamp.id), expected,
+      expect(readBool(near.id, 'result'), expected,
           reason: '|$a - $b| <= $within should be $expected');
     }
   });
 
   test('every two-input logic gate', () {
-    final lamp = addControl(ControlKind.light, 'Lamp');
     syncController();
-
     for (final (defId, a, b, expected) in [
       ('logic.and', true, false, false),
       ('logic.or', true, false, true),
@@ -313,8 +324,7 @@ void main() {
       final right = node('value.bool', {'value': b});
       wire(left.id, 'value', gate.id, 'a');
       wire(right.id, 'value', gate.id, 'b');
-      wire(gate.id, 'result', kControllerNodeId, '${lamp.id}.on');
-      expect(runner().lightOn(lamp.id), expected,
+      expect(readBool(gate.id, 'result'), expected,
           reason: '$defId($a, $b) should be $expected');
     }
   });
@@ -373,27 +383,11 @@ void main() {
   });
 
   test('a touch sensor reads pressed as a boolean', () {
-    final bump = addControl(ControlKind.light, 'Bump');
     syncController();
     final touch = node('sensor.touch', {'port': '4'});
-    wire(touch.id, 'pressed', kControllerNodeId, '${bump.id}.on');
-
-    final r = runner();
-    expect(r.lightOn(bump.id), isFalse);
+    expect(readBool(touch.id, 'pressed'), isFalse);
     brick.setSensor(4, SensorReading.touch, 1);
-    expect(r.lightOn(bump.id), isTrue);
-  });
-
-  test('a touch sensor drives a light', () {
-    final bump = addControl(ControlKind.light, 'Bump');
-    syncController();
-    final touch = node('sensor.touch', {'port': '1'});
-    wire(touch.id, 'pressed', kControllerNodeId, '${bump.id}.on');
-
-    final r = runner();
-    expect(r.lightOn(bump.id), isFalse);
-    brick.setSensor(1, SensorReading.touch, 1);
-    expect(r.lightOn(bump.id), isTrue);
+    expect(readBool(touch.id, 'pressed'), isTrue);
   });
 
   test('a display shows the slider wired in through Int → String', () {
@@ -536,10 +530,10 @@ void main() {
     expect(notified, 1);
   });
 
-  test('an unwired light is off', () {
+  test('an unwired light is off (colour 0)', () {
     final lamp = addControl(ControlKind.light, 'Lamp');
     syncController();
-    expect(runner().lightOn(lamp.id), isFalse);
+    expect(runner().lightColour(lamp.id), 0);
   });
 
   test('a data cycle evaluates to defaults instead of hanging', () {

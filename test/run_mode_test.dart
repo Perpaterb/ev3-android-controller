@@ -90,27 +90,24 @@ void main() {
     expect(brick.log.last, 'Motor A: stop');
   });
 
-  testWidgets('a toggle wired to a light turns it on', (tester) async {
-    final power = addControl(ControlKind.toggle, 'Power');
+  testWidgets('a light shows its wired colour', (tester) async {
     final lamp =
         addControl(ControlKind.light, 'Lamp', position: const Offset(0.7, 0.5));
     seed(wireUp: (graph) {
+      final red = graph.addNode(nodeDefById('value.int')!, Offset.zero);
+      graph.setConfig(red.id, 'value', 5); // EV3 colour 5 = red
       graph.connect(
-        PinRef(kControllerNodeId, '${power.id}.state', isOutput: true),
-        PinRef(kControllerNodeId, '${lamp.id}.on', isOutput: false),
+        PinRef(red.id, 'value', isOutput: true),
+        PinRef(kControllerNodeId, '${lamp.id}.colour', isOutput: false),
       );
     });
     await pumpRunMode(tester);
 
-    Color lightColor() => ((tester
+    final color = ((tester
             .widget<AnimatedContainer>(find.byKey(Key('run-light-${lamp.id}')))
             .decoration) as BoxDecoration)
         .color!;
-
-    expect(lightColor(), isNot(Colors.amber));
-    await tester.tap(find.byKey(Key('run-control-${power.id}')));
-    await tester.pump();
-    expect(lightColor(), Colors.amber);
+    expect(color, const Color(0xFFD50000)); // palette red at full brightness
   });
 
   testWidgets('a display shows the slider value live', (tester) async {

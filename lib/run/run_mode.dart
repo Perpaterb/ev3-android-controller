@@ -610,6 +610,19 @@ class _RunDisplay extends StatelessWidget {
   }
 }
 
+/// The EV3 colour palette: index 0 is off, 1-7 follow the brick's colour
+/// codes (Black, Blue, Green, Yellow, Red, White, Brown).
+const List<Color?> kEv3Palette = [
+  null, // 0 = No Colour (off)
+  Color(0xFF000000), // 1 Black
+  Color(0xFF2962FF), // 2 Blue
+  Color(0xFF00C853), // 3 Green
+  Color(0xFFFFEB3B), // 4 Yellow
+  Color(0xFFD50000), // 5 Red
+  Color(0xFFFFFFFF), // 6 White
+  Color(0xFF8D6E63), // 7 Brown
+];
+
 class _RunLight extends StatelessWidget {
   const _RunLight({required this.control, required this.runner});
 
@@ -618,7 +631,16 @@ class _RunLight extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final on = runner.lightOn(control.id);
+    final colour = runner.lightColour(control.id);
+    final brightness = runner.lightBrightness(control.id);
+    final base = (colour >= 0 && colour < kEv3Palette.length)
+        ? kEv3Palette[colour]
+        : null;
+    final on = base != null && brightness > 0;
+    // Brightness dims the colour toward black; off shows the dark socket.
+    final shown = on
+        ? Color.lerp(Colors.black, base, brightness / 100)!
+        : const Color(0xFF2B313A);
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
@@ -629,12 +651,12 @@ class _RunLight extends StatelessWidget {
           height: 36,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: on ? Colors.amber : const Color(0xFF2B313A),
+            color: shown,
             border: Border.all(color: Colors.white30, width: 2),
             boxShadow: on
                 ? [
                     BoxShadow(
-                      color: Colors.amber.withValues(alpha: 0.6),
+                      color: shown.withValues(alpha: 0.6),
                       blurRadius: 14,
                       spreadRadius: 3,
                     ),

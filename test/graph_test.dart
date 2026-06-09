@@ -250,13 +250,13 @@ void main() {
       expect(graph.node(kControllerNodeId), isNotNull);
     });
 
-    test('a controller output can wire to a controller input (toggle→light)',
+    test('a controller output can wire to a controller input (slider→light)',
         () {
       final layout = ControllerLayout();
-      final toggle = layout.addControl(
+      final slider = layout.addControl(
         tabId: layout.tabs.single.id,
-        kind: ControlKind.toggle,
-        name: 'Power',
+        kind: ControlKind.slider,
+        name: 'Dial',
         position: const Offset(0.3, 0.5),
       );
       final light = layout.addControl(
@@ -267,10 +267,11 @@ void main() {
       );
       graph.ensureControllerNode(layout.buildNodeDef(), Offset.zero);
 
+      // Slider value (int) → light colour (int), both on the controller node.
       expect(
         graph.connect(
-          PinRef(kControllerNodeId, '${toggle.id}.state', isOutput: true),
-          PinRef(kControllerNodeId, '${light.id}.on', isOutput: false),
+          PinRef(kControllerNodeId, '${slider.id}.value', isOutput: true),
+          PinRef(kControllerNodeId, '${light.id}.colour', isOutput: false),
         ),
         isTrue,
       );

@@ -76,7 +76,7 @@ void main() {
     );
   });
 
-  test('a light is an input on the controller node', () {
+  test('a light has colour and brightness inputs on the controller node', () {
     layout.addControl(
       tabId: layout.tabs.single.id,
       kind: ControlKind.light,
@@ -85,8 +85,8 @@ void main() {
     );
     final def = layout.buildNodeDef();
     expect(def.outputs, isEmpty);
-    expect(def.inputs.single.label, 'Bump on?');
-    expect(def.inputs.single.type, PinType.boolean);
+    expect(def.inputs.map((p) => p.label), ['Bump colour', 'Bump brightness']);
+    expect(def.inputs.every((p) => p.type == PinType.integer), isTrue);
   });
 
   test('a display is a string input on the controller node', () {

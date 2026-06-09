@@ -118,8 +118,12 @@ class ControllerControl {
       };
 
   List<PinSpec> get _allInputPins => switch (kind) {
+        // Colour follows the EV3 palette: 0 = off, 1 black, 2 blue, 3 green,
+        // 4 yellow, 5 red, 6 white, 7 brown — so a colour sensor's reading
+        // can wire straight in. Brightness is 0-100.
         ControlKind.light => [
-            PinSpec('$id.on', '$name on?', PinType.boolean),
+            PinSpec('$id.colour', '$name colour', PinType.integer),
+            PinSpec('$id.brightness', '$name brightness', PinType.integer),
           ],
         ControlKind.display => [
             PinSpec('$id.value', '$name value', PinType.string),
