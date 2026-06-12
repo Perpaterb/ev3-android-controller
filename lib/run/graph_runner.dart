@@ -9,6 +9,16 @@ import '../blueprint/model/pins.dart';
 import '../blueprint/model/variables.dart';
 import '../services/ev3_brick.dart';
 
+/// One dot on a plotter: a point in the plotter's coordinate range and an
+/// EV3 colour (0-7).
+@immutable
+class PlotDot {
+  const PlotDot({required this.x, required this.y, required this.colour});
+  final int x;
+  final int y;
+  final int colour;
+}
+
 /// Executes a blueprint graph, UE5-style:
 ///
 /// * Controller events (button pressed, slider changed, …) fire *power* out
@@ -114,6 +124,10 @@ class GraphRunner extends ChangeNotifier {
 
   /// Joystick positions: (x, y) each in -50..+50, magnitude clamped to 50.
   final Map<String, ({double x, double y})> _joystick = {};
+
+  /// Plotter contents: per control, a queue of "draws" (each a list of dots);
+  /// only the most recent N draws are kept.
+  final Map<String, List<List<PlotDot>>> _plots = {};
 
   /// Per-node runtime state for stateful nodes (Power → String).
   final Map<String, Object> _nodeState = {};
@@ -262,6 +276,30 @@ class GraphRunner extends ChangeNotifier {
     final mag = math.sqrt(x * x + y * y);
     if (mag <= 50) return (x: x, y: y);
     return (x: x / mag * 50, y: y / mag * 50);
+  }
+
+  // ---- plotters ------------------------------------------------------------
+
+  /// All dots currently shown by a plotter, flattened across its kept draws.
+  List<PlotDot> plotDots(String controlId) =>
+      [for (final draw in _plots[controlId] ?? const []) ...draw];
+
+  /// Reads the plotter's dot inputs and adds them as one new draw, dropping
+  /// the oldest draws past "clear after N".
+  void _plotterRender(ControllerControl control) {
+    final dots = <PlotDot>[];
+    for (var i = 0; i < control.plotterDots; i++) {
+      final x = _sliderIntSetting(control.id, 'x$i', (_) => 0);
+      final y = _sliderIntSetting(control.id, 'y$i', (_) => 0);
+      final colour =
+          _sliderIntSetting(control.id, 'colour$i', (_) => 0).clamp(0, 7);
+      dots.add(PlotDot(x: x, y: y, colour: colour));
+    }
+    final draws = _plots.putIfAbsent(control.id, () => []);
+    draws.add(dots);
+    while (draws.length > control.plotterClearAfter) {
+      draws.removeAt(0);
+    }
   }
 
   void toggleChanged(String controlId, bool value) {
@@ -437,6 +475,19 @@ class GraphRunner extends ChangeNotifier {
     // Power into a slider/joystick "set" pin jumps it to its "set to"
     // position — unless the user is actively holding that control.
     if (node.id == kControllerNodeId) {
+      if (inputPin.endsWith('.render')) {
+        final controlId =
+            inputPin.substring(0, inputPin.length - '.render'.length);
+        final control = layout.control(controlId);
+        if (control?.kind == ControlKind.plotter) _plotterRender(control!);
+        return;
+      }
+      if (inputPin.endsWith('.clear')) {
+        final controlId =
+            inputPin.substring(0, inputPin.length - '.clear'.length);
+        _plots.remove(controlId);
+        return;
+      }
       if (inputPin.endsWith('.setPos')) {
         final controlId =
             inputPin.substring(0, inputPin.length - '.setPos'.length);

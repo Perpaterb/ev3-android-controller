@@ -398,6 +398,12 @@ class _ControlVisual extends StatelessWidget {
       TextStyle(color: Colors.white70, fontSize: 12);
   static const Color _faceColor = Color(0xFF3C4654);
 
+  Widget _dot(Color colour) => Container(
+        width: 10,
+        height: 10,
+        decoration: BoxDecoration(color: colour, shape: BoxShape.circle),
+      );
+
   Widget _arrowPad(IconData icon) => Container(
         width: 48,
         height: 48,
@@ -510,6 +516,32 @@ class _ControlVisual extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ControlKind.plotter => Padding(
+          padding: const EdgeInsets.all(6),
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.black54,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.white24, width: 2),
+            ),
+            child: Stack(
+              children: [
+                Align(
+                  alignment: const Alignment(-0.3, 0.4),
+                  child: _dot(const Color(0xFFD50000)),
+                ),
+                Align(
+                  alignment: const Alignment(0.4, -0.2),
+                  child: _dot(const Color(0xFF2962FF)),
+                ),
+                Align(
+                  alignment: const Alignment(0.1, 0.7),
+                  child: _dot(const Color(0xFF00C853)),
+                ),
+              ],
+            ),
+          ),
         ),
       ControlKind.joystick => Padding(
           padding: const EdgeInsets.all(8),

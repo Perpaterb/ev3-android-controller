@@ -423,35 +423,43 @@ class _BlueprintEditorState extends State<BlueprintEditor> {
                     '${control.kind.rangeBlurb}'),
               ),
               // Live size sliders — the control resizes behind the sheet.
-              _sheetSlider(
-                key: const Key('control-size-x'),
-                icon: Icons.swap_horiz,
-                label: 'Width',
-                value: control.scaleX,
-                min: 0.5,
-                // Displays may grow to ~80% of the stage width.
-                max: control.kind == ControlKind.display ? 5.0 : 2.0,
-                divisions: control.kind == ControlKind.display ? 18 : 6,
-                display: '${(control.scaleX * 100).round()}%',
-                onChanged: (value) {
-                  _layout.setControlScale(control.id, x: value);
-                  setSheetState(() {});
-                },
-              ),
-              _sheetSlider(
-                key: const Key('control-size-y'),
-                icon: Icons.swap_vert,
-                label: 'Height',
-                value: control.scaleY,
-                min: 0.5,
-                max: 2.0,
-                divisions: 6,
-                display: '${(control.scaleY * 100).round()}%',
-                onChanged: (value) {
-                  _layout.setControlScale(control.id, y: value);
-                  setSheetState(() {});
-                },
-              ),
+              // Displays grow wide; plotters grow wide AND tall (to fill the
+              // screen).
+              () {
+                final wide = control.kind == ControlKind.display ||
+                    control.kind == ControlKind.plotter;
+                final tall = control.kind == ControlKind.plotter;
+                return Column(children: [
+                  _sheetSlider(
+                    key: const Key('control-size-x'),
+                    icon: Icons.swap_horiz,
+                    label: 'Width',
+                    value: control.scaleX,
+                    min: 0.5,
+                    max: wide ? 5.0 : 2.0,
+                    divisions: wide ? 18 : 6,
+                    display: '${(control.scaleX * 100).round()}%',
+                    onChanged: (value) {
+                      _layout.setControlScale(control.id, x: value);
+                      setSheetState(() {});
+                    },
+                  ),
+                  _sheetSlider(
+                    key: const Key('control-size-y'),
+                    icon: Icons.swap_vert,
+                    label: 'Height',
+                    value: control.scaleY,
+                    min: 0.5,
+                    max: tall ? 5.0 : 2.0,
+                    divisions: tall ? 18 : 6,
+                    display: '${(control.scaleY * 100).round()}%',
+                    onChanged: (value) {
+                      _layout.setControlScale(control.id, y: value);
+                      setSheetState(() {});
+                    },
+                  ),
+                ]);
+              }(),
               if (control.kind == ControlKind.display) ...[
                 _sheetSlider(
                   key: const Key('control-text-size'),
@@ -557,6 +565,66 @@ class _BlueprintEditorState extends State<BlueprintEditor> {
                     },
                   ),
                 ],
+              ],
+              if (control.kind == ControlKind.plotter) ...[
+                _sheetSlider(
+                  key: const Key('control-plotter-dots'),
+                  icon: Icons.scatter_plot,
+                  label: 'Dots per draw',
+                  value: control.plotterDots.toDouble(),
+                  min: 1,
+                  max: kPlotterMaxDots.toDouble(),
+                  divisions: kPlotterMaxDots - 1,
+                  display: '${control.plotterDots}',
+                  onChanged: (value) {
+                    _layout.setPlotterConfig(control.id, 'dots', value.round());
+                    setSheetState(() {});
+                  },
+                ),
+                _sheetSlider(
+                  key: const Key('control-plotter-dotsize'),
+                  icon: Icons.brightness_1,
+                  label: 'Dot size',
+                  value: control.plotterDotSize,
+                  min: 1,
+                  max: 30,
+                  divisions: 29,
+                  display: '${control.plotterDotSize.round()}',
+                  onChanged: (value) {
+                    _layout.setPlotterConfig(
+                        control.id, 'dotSize', value.round());
+                    setSheetState(() {});
+                  },
+                ),
+                _sheetSlider(
+                  key: const Key('control-plotter-clear'),
+                  icon: Icons.layers,
+                  label: 'Keep draws',
+                  value: control.plotterClearAfter
+                      .toDouble()
+                      .clamp(1, 100),
+                  min: 1,
+                  max: 100,
+                  divisions: 99,
+                  display: '${control.plotterClearAfter}',
+                  onChanged: (value) {
+                    _layout.setPlotterConfig(
+                        control.id, 'clearAfter', value.round());
+                    setSheetState(() {});
+                  },
+                ),
+                ListTile(
+                  key: const Key('control-plotter-range'),
+                  leading: const Icon(Icons.crop_free),
+                  title: const Text('Grid range'),
+                  subtitle: Text(
+                      'X ${control.plotterMinX}–${control.plotterMaxX},  '
+                      'Y ${control.plotterMinY}–${control.plotterMaxY}'),
+                  onTap: () async {
+                    await _editPlotterRange(control);
+                    setSheetState(() {});
+                  },
+                ),
               ],
               if (control.kind == ControlKind.joystick) ...[
                 SwitchListTile(
@@ -786,6 +854,52 @@ class _BlueprintEditorState extends State<BlueprintEditor> {
   }
 
   // ---- dialogs -----------------------------------------------------------
+
+  /// Lets the user type the plotter's four grid bounds.
+  Future<void> _editPlotterRange(ControllerControl control) async {
+    final minX = await _promptForInt('Grid: smallest X', control.plotterMinX);
+    if (minX == null || !mounted) return;
+    final maxX = await _promptForInt('Grid: largest X', control.plotterMaxX);
+    if (maxX == null || !mounted) return;
+    final minY = await _promptForInt('Grid: smallest Y', control.plotterMinY);
+    if (minY == null || !mounted) return;
+    final maxY = await _promptForInt('Grid: largest Y', control.plotterMaxY);
+    if (maxY == null) return;
+    _layout.setPlotterConfig(control.id, 'minX', minX);
+    _layout.setPlotterConfig(control.id, 'maxX', maxX);
+    _layout.setPlotterConfig(control.id, 'minY', minY);
+    _layout.setPlotterConfig(control.id, 'maxY', maxY);
+  }
+
+  Future<int?> _promptForInt(String title, int initial) {
+    final controller = TextEditingController(text: '$initial');
+    return showDialog<int>(
+      context: context,
+      builder: (context) {
+        void submit() {
+          final value = int.tryParse(controller.text.trim());
+          if (value != null) Navigator.pop(context, value);
+        }
+
+        return AlertDialog(
+          title: Text(title),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            keyboardType: const TextInputType.numberWithOptions(signed: true),
+            onSubmitted: (_) => submit(),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(onPressed: submit, child: const Text('OK')),
+          ],
+        );
+      },
+    );
+  }
 
   Future<String?> _promptForText({
     required String title,

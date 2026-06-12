@@ -657,6 +657,74 @@ void main() {
     });
   });
 
+  group('plotter', () {
+    test('render power draws the current dots; clear empties it', () {
+      final draw = addControl(ControlKind.button, 'Draw');
+      final clear = addControl(ControlKind.button, 'Clear');
+      final plot = addControl(ControlKind.plotter, 'Plot');
+      syncController();
+      final x = node('value.int', {'value': 30});
+      final y = node('value.int', {'value': 70});
+      final colour = node('value.int', {'value': 5}); // red
+      wire(x.id, 'value', kControllerNodeId, '${plot.id}.x0');
+      wire(y.id, 'value', kControllerNodeId, '${plot.id}.y0');
+      wire(colour.id, 'value', kControllerNodeId, '${plot.id}.colour0');
+      wire(kControllerNodeId, '${draw.id}.pressed', kControllerNodeId,
+          '${plot.id}.render');
+      wire(kControllerNodeId, '${clear.id}.pressed', kControllerNodeId,
+          '${plot.id}.clear');
+
+      final r = runner();
+      expect(r.plotDots(plot.id), isEmpty);
+      r.buttonPressed(draw.id);
+      expect(r.plotDots(plot.id), hasLength(1));
+      final dot = r.plotDots(plot.id).single;
+      expect((dot.x, dot.y, dot.colour), (30, 70, 5));
+
+      r.buttonPressed(clear.id);
+      expect(r.plotDots(plot.id), isEmpty);
+    });
+
+    test('keeps only the last N draws (clear-after)', () {
+      final draw = addControl(ControlKind.button, 'Draw');
+      final plot = addControl(ControlKind.plotter, 'Plot');
+      layout.setPlotterConfig(plot.id, 'clearAfter', 1); // default
+      syncController();
+      final x = node('value.int', {'value': 10});
+      final colour = node('value.int', {'value': 3});
+      wire(x.id, 'value', kControllerNodeId, '${plot.id}.x0');
+      wire(colour.id, 'value', kControllerNodeId, '${plot.id}.colour0');
+      wire(kControllerNodeId, '${draw.id}.pressed', kControllerNodeId,
+          '${plot.id}.render');
+
+      final r = runner();
+      r.buttonPressed(draw.id);
+      r.buttonPressed(draw.id);
+      r.buttonPressed(draw.id);
+      expect(r.plotDots(plot.id), hasLength(1)); // only the latest draw
+
+      layout.setPlotterConfig(plot.id, 'clearAfter', 3);
+      final r2 = runner();
+      r2.buttonPressed(draw.id);
+      r2.buttonPressed(draw.id);
+      r2.buttonPressed(draw.id);
+      r2.buttonPressed(draw.id);
+      expect(r2.plotDots(plot.id), hasLength(3)); // last 3 draws kept
+    });
+
+    test('dots-per-draw setting grows the X/Y/colour input pins', () {
+      final plot = addControl(ControlKind.plotter, 'Plot');
+      layout.setPlotterConfig(plot.id, 'dots', 3);
+      final def = layout.buildNodeDef();
+      // render + clear + 3 × (x,y,colour) = 11 input pins.
+      final plotterPins =
+          def.inputs.where((p) => p.id.startsWith('${plot.id}.'));
+      expect(plotterPins, hasLength(11));
+      expect(plotterPins.map((p) => p.id),
+          containsAll(['${plot.id}.x2', '${plot.id}.y2', '${plot.id}.colour2']));
+    });
+  });
+
   group('joystick', () {
     test('x/y read live and angle/distance derive from them', () {
       final stick = addControl(ControlKind.joystick, 'Move');

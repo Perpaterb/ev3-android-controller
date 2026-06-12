@@ -37,6 +37,7 @@ IconData _iconFor(ControlKind kind) => switch (kind) {
       ControlKind.joystick => Icons.gamepad,
       ControlKind.light => Icons.lightbulb_outline,
       ControlKind.display => Icons.pin_outlined,
+      ControlKind.plotter => Icons.scatter_plot,
     };
 
 String _describe(ControlKind kind) => switch (kind) {
@@ -47,4 +48,5 @@ String _describe(ControlKind kind) => switch (kind) {
       ControlKind.joystick => 'Moves in 2D: X, Y, angle and distance',
       ControlKind.light => 'Shows a colour from your robot',
       ControlKind.display => 'Shows text from your robot',
+      ControlKind.plotter => 'Plots coloured dots on an X/Y grid',
     };

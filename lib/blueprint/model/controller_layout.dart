@@ -13,7 +13,8 @@ enum ControlKind {
   toggle('Toggle'),
   joystick('Joystick'),
   light('Light'),
-  display('Display');
+  display('Display'),
+  plotter('Plotter');
 
   const ControlKind(this.label);
 
@@ -30,8 +31,16 @@ enum ControlKind {
           'Sends X and Y (−50 to +50), angle (0–359°) and distance (0–100).',
         ControlKind.light => 'Shows a colour (0–7) at a brightness (0–100).',
         ControlKind.display => 'Shows text.',
+        ControlKind.plotter =>
+          'Draws coloured dots (0–7) at X,Y points when given power.',
       };
 }
+
+/// Most dots a plotter may draw per render pulse.
+const int kPlotterMaxDots = 10;
+
+/// Total stored dots cap, to keep painting smooth.
+const int kPlotterMaxStored = 2000;
 
 /// One control on a controller tab. Its pins derive from its kind and the
 /// name the user gave it; pin ids embed the control's id (not its name) so
@@ -109,6 +118,24 @@ class ControllerControl {
   /// Whether a display draws its background box and border (off = just text).
   bool get displayFramed => config['framed'] != false;
 
+  // Plotter settings. Dots-per-draw grows the X/Y/colour input pins; the
+  // coordinate range is fixed (not auto-scaled).
+  int get plotterDots =>
+      ((config['dots'] as num?)?.toInt() ?? 1).clamp(1, kPlotterMaxDots);
+  int get plotterClearAfter {
+    final max = (kPlotterMaxStored ~/ plotterDots).clamp(1, kPlotterMaxStored);
+    return ((config['clearAfter'] as num?)?.toInt() ?? 1).clamp(1, max);
+  }
+
+  int get plotterMinX => (config['minX'] as num?)?.toInt() ?? 0;
+  int get plotterMaxX => (config['maxX'] as num?)?.toInt() ?? 100;
+  int get plotterMinY => (config['minY'] as num?)?.toInt() ?? 0;
+  int get plotterMaxY => (config['maxY'] as num?)?.toInt() ?? 100;
+
+  /// Dot radius in stage units.
+  double get plotterDotSize =>
+      (config['dotSize'] as num?)?.toDouble() ?? 5.0;
+
   /// Every pin this control could emit, before the user's declutter
   /// choices. Momentary controls expose three power pins: `touched` fires
   /// once on press, `released` once on release, and `held` (pin id `isDown`)
@@ -152,6 +179,7 @@ class ControllerControl {
           ],
         ControlKind.light => const [],
         ControlKind.display => const [],
+        ControlKind.plotter => const [],
       };
 
   List<PinSpec> get _allInputPins => switch (kind) {
@@ -182,6 +210,23 @@ class ControllerControl {
           ],
         ControlKind.display => [
             PinSpec('$id.value', '$name value', PinType.string),
+          ],
+        // Render/clear power plus an X/Y/colour trio per dot. With one dot
+        // the labels drop the number.
+        ControlKind.plotter => [
+            PinSpec('$id.render', '$name draw', PinType.power),
+            PinSpec('$id.clear', '$name clear', PinType.power),
+            for (var i = 0; i < plotterDots; i++) ...[
+              PinSpec('$id.x$i',
+                  plotterDots == 1 ? '$name X' : '$name X${i + 1}',
+                  PinType.integer),
+              PinSpec('$id.y$i',
+                  plotterDots == 1 ? '$name Y' : '$name Y${i + 1}',
+                  PinType.integer),
+              PinSpec('$id.colour$i',
+                  plotterDots == 1 ? '$name colour' : '$name colour${i + 1}',
+                  PinType.integer),
+            ],
           ],
         _ => const [],
       };
@@ -303,6 +348,7 @@ Size controlBaseSize(ControlKind kind) => switch (kind) {
       ControlKind.joystick => const Size(180, 180),
       ControlKind.light => const Size(80, 76),
       ControlKind.display => const Size(130, 80),
+      ControlKind.plotter => const Size(170, 170),
     };
 
 /// Footprint for a specific control — vertical sliders stand tall.
@@ -440,13 +486,16 @@ class ControllerLayout extends ChangeNotifier {
   }
 
   /// Sets a control's size multipliers, clamped to 50%–200% per axis.
-  /// Displays may go much wider — up to 5x (~80% of the stage width).
+  /// Displays may go much wider, and plotters much wider AND taller, so they
+  /// can fill most of the screen.
   void setControlScale(String id, {double? x, double? y}) {
     final target = control(id);
     if (target == null) return;
-    final maxX = target.kind == ControlKind.display ? 5.0 : 2.0;
-    if (x != null) target.config['scaleX'] = x.clamp(0.5, maxX);
-    if (y != null) target.config['scaleY'] = y.clamp(0.5, 2.0);
+    final wide =
+        target.kind == ControlKind.display || target.kind == ControlKind.plotter;
+    final tall = target.kind == ControlKind.plotter;
+    if (x != null) target.config['scaleX'] = x.clamp(0.5, wide ? 5.0 : 2.0);
+    if (y != null) target.config['scaleY'] = y.clamp(0.5, tall ? 5.0 : 2.0);
     notifyListeners();
   }
 
@@ -485,6 +534,19 @@ class ControllerLayout extends ChangeNotifier {
     if (target == null) return;
     target.config['default'] =
         value.clamp(target.sliderMin, target.sliderMax);
+    notifyListeners();
+  }
+
+  /// Sets a plotter config key (dots/clearAfter/minX/maxX/minY/maxY).
+  void setPlotterConfig(String id, String key, int value) {
+    final target = control(id);
+    if (target == null) return;
+    target.config[key] = switch (key) {
+      'dots' => value.clamp(1, kPlotterMaxDots),
+      'clearAfter' => value.clamp(1, kPlotterMaxStored),
+      'dotSize' => value.clamp(1, 30),
+      _ => value,
+    };
     notifyListeners();
   }
 

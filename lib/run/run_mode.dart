@@ -293,8 +293,9 @@ class _RunModeState extends State<RunMode>
       base.width * control.scaleX * factor,
       base.height * control.scaleY * factor,
     );
-    // Displays are laid out at their real size instead of being scaled
-    // through a FittedBox: the box stretches, the text never does.
+    // Displays and plotters are laid out at their real size instead of being
+    // scaled through a FittedBox, so their text / dots stay crisp at any
+    // control size.
     final sized = control.kind == ControlKind.display
         ? SizedBox(
             width: size.width,
@@ -302,7 +303,14 @@ class _RunModeState extends State<RunMode>
             child: _RunDisplay(
                 control: control, runner: _runner, factor: factor),
           )
-        : SizedBox(
+        : control.kind == ControlKind.plotter
+            ? SizedBox(
+                width: size.width,
+                height: size.height,
+                child: _RunPlotter(
+                    control: control, runner: _runner, factor: factor),
+              )
+            : SizedBox(
             width: size.width,
             height: size.height,
             child: FittedBox(
@@ -323,6 +331,7 @@ class _RunModeState extends State<RunMode>
                     _RunJoystick(control: control, runner: _runner),
                   ControlKind.light =>
                     _RunLight(control: control, runner: _runner),
+                  ControlKind.plotter => const SizedBox.shrink(), // above
                   ControlKind.display => const SizedBox.shrink(), // above
                 },
               ),
@@ -331,6 +340,7 @@ class _RunModeState extends State<RunMode>
     // Output-only controls must never swallow a touch meant for whatever is
     // underneath them.
     final passive = control.kind == ControlKind.light ||
+        control.kind == ControlKind.plotter ||
         control.kind == ControlKind.display;
     return Positioned(
       left: control.position.dx * stage.width - size.width / 2,
@@ -723,6 +733,86 @@ class _JoystickPainter extends CustomPainter {
   @override
   bool shouldRepaint(_JoystickPainter old) =>
       old.x != x || old.y != y || old.knob != knob || old.label != label;
+}
+
+/// Plots the runner's stored dots, mapping each dot's (x,y) from the
+/// plotter's configured range to the box.
+class _RunPlotter extends StatelessWidget {
+  const _RunPlotter(
+      {required this.control, required this.runner, required this.factor});
+
+  final ControllerControl control;
+  final GraphRunner runner;
+  final double factor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        if (control.showName)
+          Text(control.name,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: Colors.white70, fontSize: 12 * factor)),
+        Expanded(
+          child: Container(
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: Colors.black54,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.white24, width: 2),
+            ),
+            child: CustomPaint(
+              key: Key('run-control-${control.id}'),
+              size: Size.infinite,
+              painter: _PlotterPainter(
+                dots: runner.plotDots(control.id),
+                minX: control.plotterMinX,
+                maxX: control.plotterMaxX,
+                minY: control.plotterMinY,
+                maxY: control.plotterMaxY,
+                dotRadius: control.plotterDotSize * factor,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _PlotterPainter extends CustomPainter {
+  _PlotterPainter({
+    required this.dots,
+    required this.minX,
+    required this.maxX,
+    required this.minY,
+    required this.maxY,
+    required this.dotRadius,
+  });
+
+  final List<PlotDot> dots;
+  final int minX, maxX, minY, maxY;
+  final double dotRadius;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final spanX = (maxX - minX) == 0 ? 1 : (maxX - minX);
+    final spanY = (maxY - minY) == 0 ? 1 : (maxY - minY);
+    final r = dotRadius;
+    for (final dot in dots) {
+      final colour = (dot.colour >= 1 && dot.colour < kEv3Palette.length)
+          ? kEv3Palette[dot.colour]
+          : null;
+      if (colour == null) continue; // 0 = no colour → don't draw
+      final fx = ((dot.x - minX) / spanX).clamp(0.0, 1.0);
+      final fy = ((dot.y - minY) / spanY).clamp(0.0, 1.0);
+      final p = Offset(fx * size.width, (1 - fy) * size.height); // y up
+      canvas.drawCircle(p, r, Paint()..color = colour);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_PlotterPainter old) => true; // dots change each draw
 }
 
 class _RunToggle extends StatelessWidget {
