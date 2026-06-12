@@ -76,6 +76,39 @@ void main() {
     );
   });
 
+  test('slider behaviour config defaults and persists', () {
+    final slider = layout.addControl(
+      tabId: layout.tabs.single.id,
+      kind: ControlKind.slider,
+      name: 'Throttle',
+      position: const Offset(0.5, 0.5),
+    );
+    expect(slider.sliderVertical, isFalse);
+    expect(slider.sliderHome, 50);
+    expect(slider.sliderPowered, isFalse);
+    expect(slider.sliderStrength, 50);
+    expect(slider.sliderSprung, isFalse);
+
+    layout.setSliderConfig(slider.id, 'vertical', true);
+    layout.setSliderConfig(slider.id, 'home', 200); // clamps to 100
+    layout.setSliderConfig(slider.id, 'powered', true);
+    layout.setSliderConfig(slider.id, 'strength', 30);
+    layout.setSliderConfig(slider.id, 'sprung', true);
+    expect(slider.sliderHome, 100);
+
+    final copy = ControllerLayout.fromJson(layout.toJson()).control(slider.id)!;
+    expect(copy.sliderVertical, isTrue);
+    expect(copy.sliderPowered, isTrue);
+    expect(copy.sliderStrength, 30);
+    expect(copy.sliderSprung, isTrue);
+
+    // A slider gains its behaviour input pins.
+    expect(
+      copy.inputPins.map((p) => p.label),
+      containsAll(['Throttle home', 'Throttle set', 'Throttle powered?']),
+    );
+  });
+
   test('a light has colour and brightness inputs on the controller node', () {
     layout.addControl(
       tabId: layout.tabs.single.id,
@@ -134,7 +167,7 @@ void main() {
       name: 'Speed',
       position: const Offset(0.5, 0.5),
     );
-    expect(slider.sliderDefault, 0); // defaults to min
+    expect(slider.sliderDefault, 50); // defaults to home
     expect(slider.showValue, isTrue);
 
     layout.setSliderDefault(slider.id, 50);

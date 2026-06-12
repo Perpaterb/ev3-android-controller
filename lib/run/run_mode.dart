@@ -283,7 +283,7 @@ class _RunModeState extends State<RunMode>
   // ---- controls ------------------------------------------------------------
 
   Widget _buildControl(ControllerControl control, Size stage, double factor) {
-    final base = controlBaseSize(control.kind);
+    final base = controlBaseSizeFor(control);
     // Stage-unit size scaled to this stage's pixels — identical fraction of
     // the stage as in the designer miniature. Width and height stretch
     // independently.
@@ -498,11 +498,26 @@ class _HoldAreaState extends State<_HoldArea> {
   }
 }
 
+/// A snap-to-touch slider: touching anywhere on the track jumps the value to
+/// that point and holds while the finger is down, even if the finger drags
+/// outside the control (the value just clamps). Renders horizontally or
+/// vertically and reflects the runner's value live (so spring-return
+/// animates).
 class _RunSlider extends StatelessWidget {
   const _RunSlider({required this.control, required this.runner});
 
   final ControllerControl control;
   final GraphRunner runner;
+
+  void _setFromLocal(Offset local, Size size) {
+    final frac = control.sliderVertical
+        ? 1 - (local.dy / size.height) // top = max
+        : local.dx / size.width;
+    final min = control.sliderMin;
+    final max = control.sliderMax;
+    final value = (min + frac.clamp(0.0, 1.0) * (max - min)).round();
+    runner.sliderChanged(control.id, value);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -510,27 +525,100 @@ class _RunSlider extends StatelessWidget {
     final max = control.sliderMax.toDouble();
     final value =
         runner.sliderValue(control.id).toDouble().clamp(min, max);
-    // Caption combines name and/or value per the control's toggles.
+    final frac = (max > min) ? (value - min) / (max - min) : 0.0;
     final label = [
       if (control.showName) control.name,
       if (control.showValue) '${value.round()}',
     ].join(': ');
+
+    final track = LayoutBuilder(
+      builder: (context, constraints) {
+        final size = constraints.biggest;
+        return Listener(
+          onPointerDown: (e) {
+            runner.sliderTouchStart(control.id);
+            _setFromLocal(e.localPosition, size);
+          },
+          onPointerMove: (e) => _setFromLocal(e.localPosition, size),
+          onPointerUp: (_) => runner.sliderTouchEnd(control.id),
+          onPointerCancel: (_) => runner.sliderTouchEnd(control.id),
+          behavior: HitTestBehavior.opaque,
+          child: CustomPaint(
+            key: Key('run-control-${control.id}'),
+            size: Size.infinite,
+            painter: _SliderPainter(
+              fraction: frac,
+              vertical: control.sliderVertical,
+              fill: Theme.of(context).colorScheme.primary,
+            ),
+          ),
+        );
+      },
+    );
+
+    if (control.sliderVertical) {
+      return Row(
+        children: [
+          Expanded(child: track),
+          if (label.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(left: 4),
+              child: Text(label,
+                  overflow: TextOverflow.ellipsis, style: _controlNameStyle),
+            ),
+        ],
+      );
+    }
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         if (label.isNotEmpty)
           Text(label,
               overflow: TextOverflow.ellipsis, style: _controlNameStyle),
-        Slider(
-          key: Key('run-control-${control.id}'),
-          min: min,
-          max: max,
-          value: value,
-          onChanged: (v) => runner.sliderChanged(control.id, v.round()),
-        ),
+        Expanded(child: track),
       ],
     );
   }
+}
+
+class _SliderPainter extends CustomPainter {
+  _SliderPainter(
+      {required this.fraction, required this.vertical, required this.fill});
+
+  final double fraction;
+  final bool vertical;
+  final Color fill;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const trackThickness = 8.0;
+    const knobRadius = 14.0;
+    final rrect = vertical
+        ? RRect.fromLTRBR(
+            size.width / 2 - trackThickness / 2, 0,
+            size.width / 2 + trackThickness / 2, size.height,
+            const Radius.circular(trackThickness / 2))
+        : RRect.fromLTRBR(0, size.height / 2 - trackThickness / 2,
+            size.width, size.height / 2 + trackThickness / 2,
+            const Radius.circular(trackThickness / 2));
+    canvas.drawRRect(rrect, Paint()..color = Colors.white24);
+
+    final knob = vertical
+        ? Offset(size.width / 2, size.height * (1 - fraction))
+        : Offset(size.width * fraction, size.height / 2);
+    canvas.drawCircle(knob, knobRadius, Paint()..color = fill);
+    canvas.drawCircle(
+        knob,
+        knobRadius,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2
+          ..color = Colors.white);
+  }
+
+  @override
+  bool shouldRepaint(_SliderPainter old) =>
+      old.fraction != fraction || old.vertical != vertical || old.fill != fill;
 }
 
 class _RunToggle extends StatelessWidget {

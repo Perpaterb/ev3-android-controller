@@ -299,7 +299,7 @@ class _ControllerNodeWidgetState extends State<ControllerNodeWidget> {
   Widget _buildControl(ControllerControl control, Size stage, double factor) {
     // Stage-unit size scaled to this stage's pixels — identical fraction of
     // the stage as in Run mode. Width and height stretch independently.
-    final base = controlBaseSize(control.kind);
+    final base = controlBaseSizeFor(control);
     final size = Size(
       base.width * control.scaleX * factor,
       base.height * control.scaleY * factor,
@@ -427,37 +427,66 @@ class _ControlVisual extends StatelessWidget {
                 )),
           ),
         ),
-      ControlKind.slider => Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text('${control.name}: 0',
-                overflow: TextOverflow.ellipsis, style: _nameStyle),
-            const SizedBox(height: 14),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Stack(
-                alignment: Alignment.centerLeft,
-                children: [
-                  Container(
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: Colors.white24,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
+      ControlKind.slider => control.sliderVertical
+          ? Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Container(
+                        width: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.white24,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                      Container(
+                        width: 16,
+                        height: 16,
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.primary,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ],
                   ),
-                  Container(
-                    width: 16,
-                    height: 16,
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.primary,
-                      shape: BoxShape.circle,
-                    ),
+                ),
+              ],
+            )
+          : Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text('${control.name}: 0',
+                    overflow: TextOverflow.ellipsis, style: _nameStyle),
+                const SizedBox(height: 14),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Stack(
+                    alignment: Alignment.centerLeft,
+                    children: [
+                      Container(
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.white24,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                      Container(
+                        width: 16,
+                        height: 16,
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.primary,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
-        ),
       ControlKind.toggle => Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [

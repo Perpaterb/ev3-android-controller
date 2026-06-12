@@ -107,6 +107,10 @@ class GraphRunner extends ChangeNotifier {
   /// Live state of stateful controls: sliderId → int, toggleId → bool.
   final Map<String, Object> _controlValues = {};
 
+  /// Sliders the user currently has a finger on — their physics (spring
+  /// return, set-position) are suspended while held.
+  final Set<String> _touchingSliders = {};
+
   /// Per-node runtime state for stateful nodes (Power → String).
   final Map<String, Object> _nodeState = {};
 
@@ -209,6 +213,13 @@ class GraphRunner extends ChangeNotifier {
     _fireControl('$controlId.changed');
   }
 
+  /// The user put a finger on / lifted off a slider. While touched, spring
+  /// return and set-position are suspended.
+  void sliderTouchStart(String controlId) => _touchingSliders.add(controlId);
+  void sliderTouchEnd(String controlId) => _touchingSliders.remove(controlId);
+  bool sliderTouched(String controlId) =>
+      _touchingSliders.contains(controlId);
+
   void toggleChanged(String controlId, bool value) {
     _controlValues[controlId] = value;
     _fireControl('$controlId.switched');
@@ -262,8 +273,73 @@ class GraphRunner extends ChangeNotifier {
       }
     }
     _tickRunMotors.addAll(_motorsRunThisTick);
+    _stepSliderPhysics();
     _inTick = false;
     notifyListeners();
+  }
+
+  // ---- slider physics ------------------------------------------------------
+
+  /// Each tick, powered sliders that aren't being touched ease back toward
+  /// their home position — linearly (constant speed) or sprung (faster the
+  /// further from home).
+  void _stepSliderPhysics() {
+    for (final tab in layout.tabs) {
+      for (final control in tab.controls) {
+        if (control.kind != ControlKind.slider) continue;
+        if (_touchingSliders.contains(control.id)) continue;
+        if (!_sliderPowered(control.id)) continue;
+
+        final home = _sliderHome(control.id);
+        final current = sliderValue(control.id);
+        final delta = home - current;
+        if (delta == 0) continue;
+
+        final strength = _sliderStrength(control.id).clamp(0, 100);
+        if (strength == 0) continue;
+        final sprung = _sliderSprung(control.id);
+        // Linear: a constant step. Sprung: proportional to the distance.
+        final raw = sprung
+            ? delta.abs() * strength / 100 * 0.3
+            : strength * 0.15;
+        final step = raw.round().clamp(1, delta.abs());
+        _controlValues[control.id] = current + delta.sign * step;
+        _firePower(
+            PinRef(kControllerNodeId, '${control.id}.changed', isOutput: true),
+            0);
+      }
+    }
+  }
+
+  /// Reads a slider setting from its wired pin if present, else its option
+  /// default.
+  int _sliderHome(String controlId) =>
+      _sliderIntSetting(controlId, 'home', (c) => c.sliderHome);
+  int _sliderStrength(String controlId) =>
+      _sliderIntSetting(controlId, 'strength', (c) => c.sliderStrength);
+  bool _sliderPowered(String controlId) =>
+      _sliderBoolSetting(controlId, 'powered', (c) => c.sliderPowered);
+  bool _sliderSprung(String controlId) =>
+      _sliderBoolSetting(controlId, 'sprung', (c) => c.sliderSprung);
+
+  int _sliderIntSetting(
+      String controlId, String suffix, int Function(ControllerControl) dflt) {
+    final wire = _wireInto(
+        PinRef(kControllerNodeId, '$controlId.$suffix', isOutput: false));
+    final control = layout.control(controlId);
+    final fallback = control == null ? 0 : dflt(control);
+    if (wire == null) return fallback;
+    return _toInt(_evalOutput(wire.from, {}), fallback);
+  }
+
+  bool _sliderBoolSetting(String controlId, String suffix,
+      bool Function(ControllerControl) dflt) {
+    final wire = _wireInto(
+        PinRef(kControllerNodeId, '$controlId.$suffix', isOutput: false));
+    final control = layout.control(controlId);
+    final fallback = control != null && dflt(control);
+    if (wire == null) return fallback;
+    return _toBool(_evalOutput(wire.from, {}), fallback);
   }
 
   // ---- power propagation ---------------------------------------------------
@@ -280,6 +356,24 @@ class GraphRunner extends ChangeNotifier {
   void _execute(GraphNode node, String inputPin, int depth) {
     void fire(String outputPin) =>
         _firePower(PinRef(node.id, outputPin, isOutput: true), depth);
+
+    // Power into a slider's "set" pin jumps it to its "set to" value —
+    // unless the user is actively holding that slider.
+    if (node.id == kControllerNodeId) {
+      if (inputPin.endsWith('.setPos')) {
+        final controlId =
+            inputPin.substring(0, inputPin.length - '.setPos'.length);
+        if (!_touchingSliders.contains(controlId)) {
+          final target = _sliderIntSetting(controlId, 'setValue',
+              (c) => c.sliderHome);
+          _controlValues[controlId] = target.clamp(0, 100);
+          _firePower(
+              PinRef(kControllerNodeId, '$controlId.changed', isOutput: true),
+              depth);
+        }
+      }
+      return;
+    }
 
     switch (node.defId) {
       case 'motor.run':

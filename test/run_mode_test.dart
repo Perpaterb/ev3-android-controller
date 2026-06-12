@@ -59,8 +59,7 @@ void main() {
     await pumpRunMode(tester);
 
     expect(find.text('Go'), findsOneWidget);
-    expect(find.textContaining('Speed'), findsOneWidget);
-    expect(find.byType(Slider), findsOneWidget);
+    expect(find.textContaining('Speed'), findsOneWidget); // slider caption
     expect(find.textContaining('Practice mode'), findsOneWidget);
   });
 
@@ -133,25 +132,41 @@ void main() {
             .widget<Text>(find.byKey(Key('run-display-${readout.id}'))))
         .data!;
 
-    expect(shown(), '0'); // slider starts at its minimum
-    await tester.drag(find.byType(Slider), const Offset(120, 0));
+    expect(shown(), '50'); // slider starts at home
+    // Touch the right end of the slider → snaps high.
+    final track = tester.getRect(find.byKey(Key('run-control-${speed.id}')));
+    await tester.tapAt(Offset(track.right - 4, track.center.dy));
     await tester.pump();
-    expect(int.parse(shown()), greaterThan(0));
+    expect(int.parse(shown()), greaterThan(50));
   });
 
-  testWidgets('a slider starts at its default and can hide its value',
-      (tester) async {
+  testWidgets('a slider can hide its value caption', (tester) async {
     final speed = addControl(ControlKind.slider, 'Speed');
-    layout.setSliderDefault(speed.id, 50);
     layout.setControlShowValue(speed.id, false);
     seed();
     await pumpRunMode(tester);
 
-    // Value hidden, name still shown.
+    // Name shown, value number hidden.
     expect(find.text('Speed'), findsOneWidget);
-    expect(find.text('Speed: 50'), findsNothing);
-    final slider = tester.widget<Slider>(find.byType(Slider));
-    expect(slider.value, 50);
+    expect(find.textContaining('Speed: '), findsNothing);
+  });
+
+  testWidgets('tapping a slider snaps it to that position', (tester) async {
+    final speed = addControl(ControlKind.slider, 'Speed');
+    seed();
+    await pumpRunMode(tester);
+
+    final track = tester.getRect(find.byKey(Key('run-control-${speed.id}')));
+    // Tap near the left edge → value drops toward the minimum.
+    await tester.tapAt(Offset(track.left + 4, track.center.dy));
+    await tester.pump();
+    expect(find.textContaining('Speed: '), findsOneWidget);
+    // The caption now shows a low number.
+    final caption = tester
+        .widgetList<Text>(find.textContaining('Speed: '))
+        .first
+        .data!;
+    expect(int.parse(caption.split(': ').last), lessThan(10));
   });
 
   testWidgets('an unwired display shows --', (tester) async {

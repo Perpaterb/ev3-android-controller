@@ -64,7 +64,15 @@ class ControllerControl {
   int get sliderMin => (config['min'] as num?)?.toInt() ?? 0;
   int get sliderMax => (config['max'] as num?)?.toInt() ?? 100;
   int get sliderDefault =>
-      (config['default'] as num?)?.toInt() ?? sliderMin;
+      (config['default'] as num?)?.toInt() ?? sliderHome;
+
+  // Slider behaviour. Each of these is the *default* used when the matching
+  // input pin isn't wired; the runner reads the wired pin first.
+  bool get sliderVertical => config['vertical'] == true;
+  int get sliderHome => (config['home'] as num?)?.toInt() ?? 50;
+  bool get sliderPowered => config['powered'] == true;
+  int get sliderStrength => (config['strength'] as num?)?.toInt() ?? 50;
+  bool get sliderSprung => config['sprung'] == true;
 
   /// Capability suffixes the user has switched off, so they make no pin on
   /// the controller node (declutter). e.g. {'isDown', 'released'}.
@@ -118,6 +126,16 @@ class ControllerControl {
       };
 
   List<PinSpec> get _allInputPins => switch (kind) {
+        // Each slider setting can be driven by a pin or left to its option
+        // default; "set" + "set to" jump the slider to a position on power.
+        ControlKind.slider => [
+            PinSpec('$id.home', '$name home', PinType.integer),
+            PinSpec('$id.setPos', '$name set', PinType.power),
+            PinSpec('$id.setValue', '$name set to', PinType.integer),
+            PinSpec('$id.powered', '$name powered?', PinType.boolean),
+            PinSpec('$id.strength', '$name strength', PinType.integer),
+            PinSpec('$id.sprung', '$name sprung?', PinType.boolean),
+          ],
         // Colour follows the EV3 palette: 0 = off, 1 black, 2 blue, 3 green,
         // 4 yellow, 5 red, 6 white, 7 brown — so a colour sensor's reading
         // can wire straight in. Brightness is 0-100.
@@ -248,6 +266,15 @@ Size controlBaseSize(ControlKind kind) => switch (kind) {
       ControlKind.light => const Size(80, 76),
       ControlKind.display => const Size(130, 80),
     };
+
+/// Footprint for a specific control — vertical sliders stand tall.
+Size controlBaseSizeFor(ControllerControl control) {
+  final base = controlBaseSize(control.kind);
+  if (control.kind == ControlKind.slider && control.sliderVertical) {
+    return Size(base.height, base.width); // rotate to portrait
+  }
+  return base;
+}
 
 /// The whole controller design: tabs of controls. Always has at least one
 /// tab. Lives in `project.controller` and is the source of truth for the
@@ -420,6 +447,18 @@ class ControllerLayout extends ChangeNotifier {
     if (target == null) return;
     target.config['default'] =
         value.clamp(target.sliderMin, target.sliderMax);
+    notifyListeners();
+  }
+
+  /// Sets any slider config key (vertical/home/powered/strength/sprung).
+  void setSliderConfig(String id, String key, Object value) {
+    final target = control(id);
+    if (target == null) return;
+    if ((key == 'home' || key == 'strength') && value is int) {
+      target.config[key] = value.clamp(0, 100);
+    } else {
+      target.config[key] = value;
+    }
     notifyListeners();
   }
 

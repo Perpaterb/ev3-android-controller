@@ -399,7 +399,7 @@ void main() {
     wire(convert.id, 'result', kControllerNodeId, '${readout.id}.value');
 
     final r = runner();
-    expect(r.displayValue(readout.id), '0'); // slider starts at its minimum
+    expect(r.displayValue(readout.id), '50'); // slider starts at home
     r.sliderChanged(speed.id, 73);
     expect(r.displayValue(readout.id), '73');
   });
@@ -551,17 +551,110 @@ void main() {
     expect(brick.log, ['Motor A: run at 0% forward']);
   });
 
-  test('slider state starts at its minimum', () {
+  test('slider state starts at its home position (50)', () {
     final speed = addControl(ControlKind.slider, 'Speed');
-    syncController();
-    expect(runner().sliderValue(speed.id), 0);
-  });
-
-  test('slider starts at its configured default value', () {
-    final speed = addControl(ControlKind.slider, 'Speed');
-    layout.setSliderDefault(speed.id, 50);
     syncController();
     expect(runner().sliderValue(speed.id), 50);
+  });
+
+  test('slider starts at its configured start value', () {
+    final speed = addControl(ControlKind.slider, 'Speed');
+    layout.setSliderDefault(speed.id, 20);
+    syncController();
+    expect(runner().sliderValue(speed.id), 20);
+  });
+
+  group('slider physics', () {
+    test('a powered slider springs back toward home when released', () {
+      final speed = addControl(ControlKind.slider, 'Speed');
+      layout.setSliderConfig(speed.id, 'powered', true);
+      layout.setSliderConfig(speed.id, 'home', 50);
+      syncController();
+
+      final r = runner();
+      r.sliderChanged(speed.id, 0); // user dragged to 0
+      expect(r.sliderValue(speed.id), 0);
+      // Ticks ease it back toward home (not touched).
+      for (var i = 0; i < 200; i++) {
+        r.tick();
+      }
+      expect(r.sliderValue(speed.id), 50);
+    });
+
+    test('a passive slider stays where it is left', () {
+      final speed = addControl(ControlKind.slider, 'Speed');
+      syncController(); // powered defaults to false
+      final r = runner();
+      r.sliderChanged(speed.id, 10);
+      for (var i = 0; i < 50; i++) {
+        r.tick();
+      }
+      expect(r.sliderValue(speed.id), 10);
+    });
+
+    test('spring is suspended while the slider is touched', () {
+      final speed = addControl(ControlKind.slider, 'Speed');
+      layout.setSliderConfig(speed.id, 'powered', true);
+      syncController();
+      final r = runner();
+      r.sliderChanged(speed.id, 0);
+      r.sliderTouchStart(speed.id);
+      for (var i = 0; i < 50; i++) {
+        r.tick();
+      }
+      expect(r.sliderValue(speed.id), 0); // held, so no return
+      r.sliderTouchEnd(speed.id);
+      for (var i = 0; i < 200; i++) {
+        r.tick();
+      }
+      expect(r.sliderValue(speed.id), 50); // released → returns home
+    });
+
+    test('set-position pin jumps the slider on power', () {
+      final go = addControl(ControlKind.button, 'Go');
+      final speed = addControl(ControlKind.slider, 'Speed');
+      syncController();
+      final target = node('value.int', {'value': 80});
+      wire(target.id, 'value', kControllerNodeId, '${speed.id}.setValue');
+      wire(kControllerNodeId, '${go.id}.pressed', kControllerNodeId,
+          '${speed.id}.setPos');
+
+      final r = runner();
+      expect(r.sliderValue(speed.id), 50);
+      r.buttonPressed(go.id);
+      expect(r.sliderValue(speed.id), 80);
+    });
+
+    test('set-position is ignored while the slider is touched', () {
+      final go = addControl(ControlKind.button, 'Go');
+      final speed = addControl(ControlKind.slider, 'Speed');
+      syncController();
+      final target = node('value.int', {'value': 80});
+      wire(target.id, 'value', kControllerNodeId, '${speed.id}.setValue');
+      wire(kControllerNodeId, '${go.id}.pressed', kControllerNodeId,
+          '${speed.id}.setPos');
+
+      final r = runner();
+      r.sliderChanged(speed.id, 10);
+      r.sliderTouchStart(speed.id);
+      r.buttonPressed(go.id);
+      expect(r.sliderValue(speed.id), 10); // touch wins
+    });
+
+    test('a wired home pin overrides the option default', () {
+      final speed = addControl(ControlKind.slider, 'Speed');
+      layout.setSliderConfig(speed.id, 'powered', true);
+      syncController();
+      final home = node('value.int', {'value': 90});
+      wire(home.id, 'value', kControllerNodeId, '${speed.id}.home');
+
+      final r = runner();
+      r.sliderChanged(speed.id, 0);
+      for (var i = 0; i < 300; i++) {
+        r.tick();
+      }
+      expect(r.sliderValue(speed.id), 90); // returns to the wired home
+    });
   });
 
   group('tick model', () {

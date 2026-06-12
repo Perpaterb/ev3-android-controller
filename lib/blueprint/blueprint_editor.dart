@@ -477,7 +477,17 @@ class _BlueprintEditorState extends State<BlueprintEditor> {
                   },
                 ),
               ],
-              if (control.kind == ControlKind.slider)
+              if (control.kind == ControlKind.slider) ...[
+                SwitchListTile(
+                  key: const Key('control-slider-vertical'),
+                  secondary: const Icon(Icons.straighten),
+                  title: const Text('Up-and-down (vertical)'),
+                  value: control.sliderVertical,
+                  onChanged: (value) {
+                    _layout.setSliderConfig(control.id, 'vertical', value);
+                    setSheetState(() {});
+                  },
+                ),
                 _sheetSlider(
                   key: const Key('control-slider-default'),
                   icon: Icons.flag_outlined,
@@ -492,6 +502,61 @@ class _BlueprintEditorState extends State<BlueprintEditor> {
                     setSheetState(() {});
                   },
                 ),
+                _sheetSlider(
+                  key: const Key('control-slider-home'),
+                  icon: Icons.home_outlined,
+                  label: 'Home',
+                  value: control.sliderHome.toDouble(),
+                  min: 0,
+                  max: 100,
+                  divisions: 100,
+                  display: '${control.sliderHome}',
+                  onChanged: (value) {
+                    _layout.setSliderConfig(
+                        control.id, 'home', value.round());
+                    setSheetState(() {});
+                  },
+                ),
+                SwitchListTile(
+                  key: const Key('control-slider-powered'),
+                  secondary: const Icon(Icons.bolt),
+                  title: const Text('Springs back to home'),
+                  subtitle: const Text('Off = stays where you leave it'),
+                  value: control.sliderPowered,
+                  onChanged: (value) {
+                    _layout.setSliderConfig(control.id, 'powered', value);
+                    setSheetState(() {});
+                  },
+                ),
+                if (control.sliderPowered) ...[
+                  _sheetSlider(
+                    key: const Key('control-slider-strength'),
+                    icon: Icons.speed,
+                    label: 'Spring speed',
+                    value: control.sliderStrength.toDouble(),
+                    min: 0,
+                    max: 100,
+                    divisions: 100,
+                    display: '${control.sliderStrength}',
+                    onChanged: (value) {
+                      _layout.setSliderConfig(
+                          control.id, 'strength', value.round());
+                      setSheetState(() {});
+                    },
+                  ),
+                  SwitchListTile(
+                    key: const Key('control-slider-sprung'),
+                    secondary: const Icon(Icons.waves),
+                    title: const Text('Sprung (stronger further out)'),
+                    subtitle: const Text('Off = steady speed'),
+                    value: control.sliderSprung,
+                    onChanged: (value) {
+                      _layout.setSliderConfig(control.id, 'sprung', value);
+                      setSheetState(() {});
+                    },
+                  ),
+                ],
+              ],
               SwitchListTile(
                 key: const Key('control-show-name'),
                 secondary: const Icon(Icons.label_outline),
