@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:ev3_controller/blueprint/model/controller_layout.dart';
 import 'package:ev3_controller/blueprint/model/graph.dart';
 import 'package:ev3_controller/blueprint/model/node_def.dart';
@@ -759,17 +761,30 @@ void main() {
       expect(r.displayValue(da.id), '0'); // up = 0°
     });
 
-    test('movement is clamped inside the circle', () {
+    test('a corner push gives full X and full Y; knob stays in the circle',
+        () {
       final stick = addControl(ControlKind.joystick, 'Move');
       syncController();
       final r = runner();
-      r.joystickMoved(stick.id, 50, 50); // corner — outside the circle
-      final mag = (r.joystickX(stick.id) * r.joystickX(stick.id) +
-              r.joystickY(stick.id) * r.joystickY(stick.id))
-          .toDouble();
-      // Magnitude can't exceed 50 (allow rounding slop).
-      expect(mag, lessThanOrEqualTo(50 * 50 + 2));
+      r.joystickMoved(stick.id, 50, 50); // pushed to the corner
+      // Outputs reach full ±50 on both axes (square output)…
+      expect(r.joystickX(stick.id), 50);
+      expect(r.joystickY(stick.id), 50);
+      // …but the visible knob is clamped to the circle (magnitude ≤ 50).
+      final p = r.joystickPos(stick.id);
+      expect(math.sqrt(p.x * p.x + p.y * p.y), lessThanOrEqualTo(50.5));
       expect(r.joystickDistance(stick.id), 100);
+    });
+
+    test('lock-to-axis zeroes the unused axis', () {
+      final stick = addControl(ControlKind.joystick, 'Move');
+      layout.setSliderConfig(stick.id, 'lockAxis', true);
+      layout.setSliderConfig(stick.id, 'axis', 'x'); // left-right only
+      syncController();
+      final r = runner();
+      r.joystickMoved(stick.id, 40, 30);
+      expect(r.joystickX(stick.id), 40);
+      expect(r.joystickY(stick.id), 0); // Y locked out
     });
 
     test('a powered joystick springs back to centre', () {

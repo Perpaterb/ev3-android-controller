@@ -411,9 +411,14 @@ class _BlueprintEditorState extends State<BlueprintEditor> {
   Future<void> _controlMenu(ControllerControl control) async {
     final action = await showModalBottomSheet<String>(
       context: context,
+      isScrollControlled: true, // tall, scrollable — many options now
       builder: (context) => SafeArea(
         child: StatefulBuilder(
-          builder: (context, setSheetState) => ListView(
+          builder: (context, setSheetState) => ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.85,
+            ),
+            child: ListView(
             shrinkWrap: true,
             children: [
               ListTile(
@@ -625,8 +630,56 @@ class _BlueprintEditorState extends State<BlueprintEditor> {
                     setSheetState(() {});
                   },
                 ),
+                SwitchListTile(
+                  key: const Key('control-plotter-framed'),
+                  secondary: const Icon(Icons.crop_square),
+                  title: const Text('Show background box'),
+                  value: control.plotterFramed,
+                  onChanged: (value) {
+                    _layout.setDisplayFramed(control.id, value);
+                    setSheetState(() {});
+                  },
+                ),
               ],
               if (control.kind == ControlKind.joystick) ...[
+                SwitchListTile(
+                  key: const Key('control-joystick-lock'),
+                  secondary: const Icon(Icons.lock_outline),
+                  title: const Text('Lock to one axis'),
+                  value: control.config['lockAxis'] == true,
+                  onChanged: (value) {
+                    _layout.setSliderConfig(control.id, 'lockAxis', value);
+                    setSheetState(() {});
+                  },
+                ),
+                if (control.config['lockAxis'] == true)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.swap_calls),
+                        const SizedBox(width: 8),
+                        const Text('Which axis'),
+                        const Spacer(),
+                        SegmentedButton<String>(
+                          key: const Key('control-joystick-axis'),
+                          segments: const [
+                            ButtonSegment(
+                                value: 'x', label: Text('Left–right')),
+                            ButtonSegment(value: 'y', label: Text('Up–down')),
+                          ],
+                          selected: {
+                            (control.config['axis'] as String?) ?? 'x'
+                          },
+                          onSelectionChanged: (s) {
+                            _layout.setSliderConfig(
+                                control.id, 'axis', s.first);
+                            setSheetState(() {});
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
                 SwitchListTile(
                   key: const Key('control-joystick-powered'),
                   secondary: const Icon(Icons.bolt),
@@ -739,6 +792,7 @@ class _BlueprintEditorState extends State<BlueprintEditor> {
                 onTap: () => Navigator.pop(context, 'delete'),
               ),
             ],
+          ),
           ),
         ),
       ),

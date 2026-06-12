@@ -757,11 +757,13 @@ class _RunPlotter extends StatelessWidget {
         Expanded(
           child: Container(
             width: double.infinity,
-            decoration: BoxDecoration(
-              color: Colors.black54,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.white24, width: 2),
-            ),
+            decoration: control.plotterFramed
+                ? BoxDecoration(
+                    color: Colors.black54,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.white24, width: 2),
+                  )
+                : null,
             child: CustomPaint(
               key: Key('run-control-${control.id}'),
               size: Size.infinite,

@@ -520,11 +520,13 @@ class _ControlVisual extends StatelessWidget {
       ControlKind.plotter => Padding(
           padding: const EdgeInsets.all(6),
           child: Container(
-            decoration: BoxDecoration(
-              color: Colors.black54,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.white24, width: 2),
-            ),
+            decoration: control.plotterFramed
+                ? BoxDecoration(
+                    color: Colors.black54,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.white24, width: 2),
+                  )
+                : null,
             child: Stack(
               children: [
                 Align(

@@ -149,6 +149,9 @@ class ControllerControl {
   double get plotterDotSize =>
       (config['dotSize'] as num?)?.toDouble() ?? 5.0;
 
+  /// Whether the plotter draws its background box and border.
+  bool get plotterFramed => config['framed'] != false;
+
   /// Every pin this control could emit, before the user's declutter
   /// choices. Momentary controls expose three power pins: `touched` fires
   /// once on press, `released` once on release, and `held` (pin id `isDown`)
@@ -531,6 +534,7 @@ class ControllerLayout extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Shared by displays and plotters (both store 'framed').
   void setDisplayFramed(String id, bool framed) {
     final target = control(id);
     if (target == null) return;

@@ -240,10 +240,22 @@ class GraphRunner extends ChangeNotifier {
 
   // ---- joysticks -----------------------------------------------------------
 
-  /// Moves a joystick to ([x], [y]) in -50..+50, clamped inside the unit
-  /// circle so it can't reach the square corners.
+  /// Moves a joystick to ([x], [y]) in -50..+50. The stored position is the
+  /// raw per-axis value (each clamped to ±50), so a corner push gives full
+  /// X *and* full Y — the visual knob is what's circle-clamped, not the
+  /// output. Lock-to-axis zeroes the unused axis.
   void joystickMoved(String controlId, double x, double y) {
-    _joystick[controlId] = _clampCircle(x, y);
+    final control = layout.control(controlId);
+    var nx = x.clamp(-50.0, 50.0);
+    var ny = y.clamp(-50.0, 50.0);
+    if (control?.config['lockAxis'] == true) {
+      if ((control?.config['axis'] ?? 'x') == 'x') {
+        ny = 0;
+      } else {
+        nx = 0;
+      }
+    }
+    _joystick[controlId] = (x: nx, y: ny);
     _firePower(
         PinRef(kControllerNodeId, '$controlId.moved', isOutput: true), 0);
     notifyListeners();
@@ -252,21 +264,29 @@ class GraphRunner extends ChangeNotifier {
   void joystickTouchStart(String controlId) => _touchingSliders.add(controlId);
   void joystickTouchEnd(String controlId) => _touchingSliders.remove(controlId);
 
-  ({double x, double y}) joystickPos(String controlId) =>
+  /// Raw stored position (square, per-axis ±50).
+  ({double x, double y}) _joystickRaw(String controlId) =>
       _joystick[controlId] ?? (x: 0, y: 0);
 
-  int joystickX(String controlId) => joystickPos(controlId).x.round();
-  int joystickY(String controlId) => joystickPos(controlId).y.round();
+  /// Where to draw the knob — clamped inside the circle so it never reaches
+  /// the corners.
+  ({double x, double y}) joystickPos(String controlId) {
+    final p = _joystickRaw(controlId);
+    return _clampCircle(p.x, p.y);
+  }
 
-  /// 0-100 from centre to the edge.
+  int joystickX(String controlId) => _joystickRaw(controlId).x.round();
+  int joystickY(String controlId) => _joystickRaw(controlId).y.round();
+
+  /// 0-100 from centre to the (circle) edge.
   int joystickDistance(String controlId) {
-    final p = joystickPos(controlId);
+    final p = joystickPos(controlId); // circle-clamped
     return (math.sqrt(p.x * p.x + p.y * p.y) / 50 * 100).round().clamp(0, 100);
   }
 
   /// 0-359°, 0 at the top, increasing clockwise. 0 when centred.
   int joystickAngle(String controlId) {
-    final p = joystickPos(controlId);
+    final p = _joystickRaw(controlId);
     if (p.x == 0 && p.y == 0) return 0;
     final deg = math.atan2(p.x, p.y) * 180 / math.pi; // 0 up, CW
     return ((deg % 360) + 360).round() % 360;
@@ -397,7 +417,7 @@ class GraphRunner extends ChangeNotifier {
         (c) => c.joystickPowered)) {
       return;
     }
-    final p = joystickPos(control.id);
+    final p = _joystickRaw(control.id);
     final mag = math.sqrt(p.x * p.x + p.y * p.y);
     if (mag < 0.5) {
       if (p.x != 0 || p.y != 0) _joystick[control.id] = (x: 0, y: 0);
@@ -494,16 +514,9 @@ class GraphRunner extends ChangeNotifier {
         if (!_touchingSliders.contains(controlId)) {
           final control = layout.control(controlId);
           if (control?.kind == ControlKind.joystick) {
-            final x = _sliderIntSetting(controlId, 'setX', (_) => 0)
-                .clamp(-50, 50)
-                .toDouble();
-            final y = _sliderIntSetting(controlId, 'setY', (_) => 0)
-                .clamp(-50, 50)
-                .toDouble();
-            _joystick[controlId] = _clampCircle(x, y);
-            _firePower(
-                PinRef(kControllerNodeId, '$controlId.moved', isOutput: true),
-                depth);
+            final x = _sliderIntSetting(controlId, 'setX', (_) => 0).toDouble();
+            final y = _sliderIntSetting(controlId, 'setY', (_) => 0).toDouble();
+            joystickMoved(controlId, x, y); // applies clamp + lock-axis
           } else {
             final target =
                 _sliderIntSetting(controlId, 'setValue', (c) => c.sliderHome);
