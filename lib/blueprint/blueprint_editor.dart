@@ -667,6 +667,22 @@ class _BlueprintEditorState extends State<BlueprintEditor> {
                   ),
                 ],
               ],
+              _sheetSlider(
+                key: const Key('control-layer'),
+                icon: Icons.layers_outlined,
+                label: 'Layer',
+                value: control.layer.toDouble(),
+                min: 0,
+                max: 9,
+                divisions: 9,
+                display: control.layer == 0
+                    ? 'back'
+                    : (control.layer == 9 ? 'front' : '${control.layer}'),
+                onChanged: (value) {
+                  _layout.setControlLayer(control.id, value.round());
+                  setSheetState(() {});
+                },
+              ),
               SwitchListTile(
                 key: const Key('control-show-name'),
                 secondary: const Icon(Icons.label_outline),

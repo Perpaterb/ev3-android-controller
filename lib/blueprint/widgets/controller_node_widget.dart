@@ -284,7 +284,7 @@ class _ControllerNodeWidgetState extends State<ControllerNodeWidget> {
                         style: TextStyle(color: Colors.white30, fontSize: 11),
                       ),
                     ),
-                  for (final control in tab.controls)
+                  for (final control in controlsInPaintOrder(tab.controls))
                     _buildControl(control, stage,
                         stage.width / stageUnitsWidth(tab.landscape)),
                 ],

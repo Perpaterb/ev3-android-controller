@@ -80,6 +80,19 @@ class ControllerControl {
   /// Whether the control's name is drawn on the Run screen.
   bool get showName => config['showName'] != false;
 
+  /// Stacking order (0 = back … higher = front). Output-only controls
+  /// (displays, plotters, lights) default behind interactive ones, so they
+  /// never cover a button or slider.
+  int get layer => (config['layer'] as num?)?.toInt() ?? defaultLayer;
+
+  int get defaultLayer => switch (kind) {
+        ControlKind.display ||
+        ControlKind.plotter ||
+        ControlKind.light =>
+          0,
+        _ => 5,
+      };
+
   /// Whether a slider shows its current number on the Run screen.
   bool get showValue => config['showValue'] != false;
 
@@ -318,6 +331,17 @@ class ControllerTab {
       );
 }
 
+/// Controls ordered back-to-front for painting: lower [ControllerControl.layer]
+/// first, ties broken by their original order (later-added on top).
+List<ControllerControl> controlsInPaintOrder(List<ControllerControl> controls) {
+  final indexed = controls.indexed.toList()
+    ..sort((a, b) {
+      final byLayer = a.$2.layer.compareTo(b.$2.layer);
+      return byLayer != 0 ? byLayer : a.$1.compareTo(b.$1);
+    });
+  return [for (final (_, c) in indexed) c];
+}
+
 /// Largest size of the given aspect ratio that fits inside [available].
 Size fitAspect(Size available, double aspect) {
   var width = available.width;
@@ -518,6 +542,13 @@ class ControllerLayout extends ChangeNotifier {
     final target = control(id);
     if (target == null) return;
     target.config['showName'] = show;
+    notifyListeners();
+  }
+
+  void setControlLayer(String id, int layer) {
+    final target = control(id);
+    if (target == null) return;
+    target.config['layer'] = layer.clamp(0, 9);
     notifyListeners();
   }
 

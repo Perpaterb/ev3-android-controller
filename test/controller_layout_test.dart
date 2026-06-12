@@ -109,6 +109,33 @@ void main() {
     );
   });
 
+  test('output controls default behind interactive ones in paint order', () {
+    final tab = layout.tabs.single.id;
+    // Add a display first, then a button — naive order would paint the
+    // button under the display.
+    final display = layout.addControl(
+        tabId: tab,
+        kind: ControlKind.display,
+        name: 'Score',
+        position: const Offset(0.5, 0.5));
+    final button = layout.addControl(
+        tabId: tab,
+        kind: ControlKind.button,
+        name: 'Go',
+        position: const Offset(0.5, 0.5));
+    expect(display.layer, 0); // output → back
+    expect(button.layer, 5); // interactive → front
+
+    final order = controlsInPaintOrder(layout.tabs.single.controls);
+    expect(order.first.id, display.id); // painted first = behind
+    expect(order.last.id, button.id); // painted last = on top
+
+    // The user can override: push the display in front.
+    layout.setControlLayer(display.id, 9);
+    final order2 = controlsInPaintOrder(layout.tabs.single.controls);
+    expect(order2.last.id, display.id);
+  });
+
   test('a light has colour and brightness inputs on the controller node', () {
     layout.addControl(
       tabId: layout.tabs.single.id,

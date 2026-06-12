@@ -152,7 +152,8 @@ class _RunModeState extends State<RunMode>
                                 style: TextStyle(color: Colors.white38),
                               ),
                             ),
-                          for (final control in tab.controls)
+                          for (final control
+                              in controlsInPaintOrder(tab.controls))
                             _buildControl(control, stage,
                                 stage.width / stageUnitsWidth(tab.landscape)),
                         ],
