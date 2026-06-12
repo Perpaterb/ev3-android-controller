@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 
@@ -107,9 +108,12 @@ class GraphRunner extends ChangeNotifier {
   /// Live state of stateful controls: sliderId → int, toggleId → bool.
   final Map<String, Object> _controlValues = {};
 
-  /// Sliders the user currently has a finger on — their physics (spring
-  /// return, set-position) are suspended while held.
+  /// Sliders and joysticks the user currently has a finger on — their physics
+  /// (spring return, set-position) are suspended while held.
   final Set<String> _touchingSliders = {};
+
+  /// Joystick positions: (x, y) each in -50..+50, magnitude clamped to 50.
+  final Map<String, ({double x, double y})> _joystick = {};
 
   /// Per-node runtime state for stateful nodes (Power → String).
   final Map<String, Object> _nodeState = {};
@@ -220,6 +224,46 @@ class GraphRunner extends ChangeNotifier {
   bool sliderTouched(String controlId) =>
       _touchingSliders.contains(controlId);
 
+  // ---- joysticks -----------------------------------------------------------
+
+  /// Moves a joystick to ([x], [y]) in -50..+50, clamped inside the unit
+  /// circle so it can't reach the square corners.
+  void joystickMoved(String controlId, double x, double y) {
+    _joystick[controlId] = _clampCircle(x, y);
+    _firePower(
+        PinRef(kControllerNodeId, '$controlId.moved', isOutput: true), 0);
+    notifyListeners();
+  }
+
+  void joystickTouchStart(String controlId) => _touchingSliders.add(controlId);
+  void joystickTouchEnd(String controlId) => _touchingSliders.remove(controlId);
+
+  ({double x, double y}) joystickPos(String controlId) =>
+      _joystick[controlId] ?? (x: 0, y: 0);
+
+  int joystickX(String controlId) => joystickPos(controlId).x.round();
+  int joystickY(String controlId) => joystickPos(controlId).y.round();
+
+  /// 0-100 from centre to the edge.
+  int joystickDistance(String controlId) {
+    final p = joystickPos(controlId);
+    return (math.sqrt(p.x * p.x + p.y * p.y) / 50 * 100).round().clamp(0, 100);
+  }
+
+  /// 0-359°, 0 at the top, increasing clockwise. 0 when centred.
+  int joystickAngle(String controlId) {
+    final p = joystickPos(controlId);
+    if (p.x == 0 && p.y == 0) return 0;
+    final deg = math.atan2(p.x, p.y) * 180 / math.pi; // 0 up, CW
+    return ((deg % 360) + 360).round() % 360;
+  }
+
+  static ({double x, double y}) _clampCircle(double x, double y) {
+    final mag = math.sqrt(x * x + y * y);
+    if (mag <= 50) return (x: x, y: y);
+    return (x: x / mag * 50, y: y / mag * 50);
+  }
+
   void toggleChanged(String controlId, bool value) {
     _controlValues[controlId] = value;
     _fireControl('$controlId.switched');
@@ -286,30 +330,63 @@ class GraphRunner extends ChangeNotifier {
   void _stepSliderPhysics() {
     for (final tab in layout.tabs) {
       for (final control in tab.controls) {
-        if (control.kind != ControlKind.slider) continue;
         if (_touchingSliders.contains(control.id)) continue;
-        if (!_sliderPowered(control.id)) continue;
-
-        final home = _sliderHome(control.id);
-        final current = sliderValue(control.id);
-        final delta = home - current;
-        if (delta == 0) continue;
-
-        final strength = _sliderStrength(control.id).clamp(0, 100);
-        if (strength == 0) continue;
-        final sprung = _sliderSprung(control.id);
-        // Linear: a constant step. Sprung: proportional to the distance.
-        final raw = sprung
-            ? delta.abs() * strength / 100 * 0.3
-            : strength * 0.15;
-        final step = raw.round().clamp(1, delta.abs());
-        _controlValues[control.id] = current + delta.sign * step;
-        _firePower(
-            PinRef(kControllerNodeId, '${control.id}.changed', isOutput: true),
-            0);
+        if (control.kind == ControlKind.slider) {
+          _stepSlider(control);
+        } else if (control.kind == ControlKind.joystick) {
+          _stepJoystick(control);
+        }
       }
     }
   }
+
+  void _stepSlider(ControllerControl control) {
+    if (!_sliderPowered(control.id)) return;
+    final home = _sliderHome(control.id);
+    final current = sliderValue(control.id);
+    final delta = home - current;
+    if (delta == 0) return;
+    final strength = _sliderStrength(control.id).clamp(0, 100);
+    if (strength == 0) return;
+    final step = _easeStep(delta.abs(), strength, _sliderSprung(control.id));
+    _controlValues[control.id] = current + delta.sign * step;
+    _firePower(
+        PinRef(kControllerNodeId, '${control.id}.changed', isOutput: true), 0);
+  }
+
+  void _stepJoystick(ControllerControl control) {
+    if (!_joystickSetting(control.id, 'powered',
+        (c) => c.joystickPowered)) {
+      return;
+    }
+    final p = joystickPos(control.id);
+    final mag = math.sqrt(p.x * p.x + p.y * p.y);
+    if (mag < 0.5) {
+      if (p.x != 0 || p.y != 0) _joystick[control.id] = (x: 0, y: 0);
+      return;
+    }
+    final strength = _sliderIntSetting(
+            control.id, 'strength', (c) => c.joystickStrength)
+        .clamp(0, 100);
+    if (strength == 0) return;
+    final sprung =
+        _joystickSetting(control.id, 'sprung', (c) => c.joystickSprung);
+    final step = _easeStep(mag, strength, sprung).toDouble();
+    final factor = (mag - step).clamp(0.0, mag) / mag; // shrink toward centre
+    _joystick[control.id] = (x: p.x * factor, y: p.y * factor);
+    _firePower(
+        PinRef(kControllerNodeId, '${control.id}.moved', isOutput: true), 0);
+  }
+
+  /// Steps toward a target: linear (constant) or sprung (faster when far).
+  int _easeStep(num distance, int strength, bool sprung) {
+    final raw = sprung ? distance * strength / 100 * 0.3 : strength * 0.15;
+    return raw.round().clamp(1, distance.ceil());
+  }
+
+  bool _joystickSetting(String controlId, String suffix,
+          bool Function(ControllerControl) dflt) =>
+      _sliderBoolSetting(controlId, suffix, dflt);
 
   /// Reads a slider setting from its wired pin if present, else its option
   /// default.
@@ -357,19 +434,33 @@ class GraphRunner extends ChangeNotifier {
     void fire(String outputPin) =>
         _firePower(PinRef(node.id, outputPin, isOutput: true), depth);
 
-    // Power into a slider's "set" pin jumps it to its "set to" value —
-    // unless the user is actively holding that slider.
+    // Power into a slider/joystick "set" pin jumps it to its "set to"
+    // position — unless the user is actively holding that control.
     if (node.id == kControllerNodeId) {
       if (inputPin.endsWith('.setPos')) {
         final controlId =
             inputPin.substring(0, inputPin.length - '.setPos'.length);
         if (!_touchingSliders.contains(controlId)) {
-          final target = _sliderIntSetting(controlId, 'setValue',
-              (c) => c.sliderHome);
-          _controlValues[controlId] = target.clamp(0, 100);
-          _firePower(
-              PinRef(kControllerNodeId, '$controlId.changed', isOutput: true),
-              depth);
+          final control = layout.control(controlId);
+          if (control?.kind == ControlKind.joystick) {
+            final x = _sliderIntSetting(controlId, 'setX', (_) => 0)
+                .clamp(-50, 50)
+                .toDouble();
+            final y = _sliderIntSetting(controlId, 'setY', (_) => 0)
+                .clamp(-50, 50)
+                .toDouble();
+            _joystick[controlId] = _clampCircle(x, y);
+            _firePower(
+                PinRef(kControllerNodeId, '$controlId.moved', isOutput: true),
+                depth);
+          } else {
+            final target =
+                _sliderIntSetting(controlId, 'setValue', (c) => c.sliderHome);
+            _controlValues[controlId] = target.clamp(0, 100);
+            _firePower(
+                PinRef(kControllerNodeId, '$controlId.changed', isOutput: true),
+                depth);
+          }
         }
       }
       return;
@@ -586,6 +677,10 @@ class GraphRunner extends ChangeNotifier {
     return switch (pinId.substring(dot + 1)) {
       'value' => sliderValue(controlId),
       'state' => toggleValue(controlId),
+      'x' => joystickX(controlId),
+      'y' => joystickY(controlId),
+      'angle' => joystickAngle(controlId),
+      'distance' => joystickDistance(controlId),
       _ => null,
     };
   }

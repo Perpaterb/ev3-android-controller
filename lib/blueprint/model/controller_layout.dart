@@ -11,12 +11,26 @@ enum ControlKind {
   dpad('D-pad'),
   slider('Slider'),
   toggle('Toggle'),
+  joystick('Joystick'),
   light('Light'),
   display('Display');
 
   const ControlKind(this.label);
 
   final String label;
+
+  /// One-line summary of what this control sends/receives and its ranges,
+  /// shown in the control's settings.
+  String get rangeBlurb => switch (this) {
+        ControlKind.button => 'Sends power when touched, held and released.',
+        ControlKind.dpad => 'Each direction sends power (touched/held/released).',
+        ControlKind.slider => 'Sends a number 0–100.',
+        ControlKind.toggle => 'Sends yes / no, and power when switched.',
+        ControlKind.joystick =>
+          'Sends X and Y (−50 to +50), angle (0–359°) and distance (0–100).',
+        ControlKind.light => 'Shows a colour (0–7) at a brightness (0–100).',
+        ControlKind.display => 'Shows text.',
+      };
 }
 
 /// One control on a controller tab. Its pins derive from its kind and the
@@ -74,6 +88,12 @@ class ControllerControl {
   int get sliderStrength => (config['strength'] as num?)?.toInt() ?? 50;
   bool get sliderSprung => config['sprung'] == true;
 
+  // Joysticks share the power options but default to powered + sprung (they
+  // spring back to centre, 0,0).
+  bool get joystickPowered => config['powered'] != false;
+  int get joystickStrength => (config['strength'] as num?)?.toInt() ?? 50;
+  bool get joystickSprung => config['sprung'] != false;
+
   /// Capability suffixes the user has switched off, so they make no pin on
   /// the controller node (declutter). e.g. {'isDown', 'released'}.
   Set<String> get hiddenCapabilities =>
@@ -121,6 +141,15 @@ class ControllerControl {
             PinSpec('$id.state', '$name?', PinType.boolean),
             PinSpec('$id.switched', '$name switched', PinType.power),
           ],
+        // X/Y are −50..+50 (centre 0); angle 0-359° (0 at top, clockwise);
+        // distance 0-100 from centre.
+        ControlKind.joystick => [
+            PinSpec('$id.x', '$name X', PinType.integer),
+            PinSpec('$id.y', '$name Y', PinType.integer),
+            PinSpec('$id.angle', '$name angle', PinType.integer),
+            PinSpec('$id.distance', '$name distance', PinType.integer),
+            PinSpec('$id.moved', '$name moved', PinType.power),
+          ],
         ControlKind.light => const [],
         ControlKind.display => const [],
       };
@@ -132,6 +161,14 @@ class ControllerControl {
             PinSpec('$id.home', '$name home', PinType.integer),
             PinSpec('$id.setPos', '$name set', PinType.power),
             PinSpec('$id.setValue', '$name set to', PinType.integer),
+            PinSpec('$id.powered', '$name powered?', PinType.boolean),
+            PinSpec('$id.strength', '$name strength', PinType.integer),
+            PinSpec('$id.sprung', '$name sprung?', PinType.boolean),
+          ],
+        ControlKind.joystick => [
+            PinSpec('$id.setPos', '$name set', PinType.power),
+            PinSpec('$id.setX', '$name set X', PinType.integer),
+            PinSpec('$id.setY', '$name set Y', PinType.integer),
             PinSpec('$id.powered', '$name powered?', PinType.boolean),
             PinSpec('$id.strength', '$name strength', PinType.integer),
             PinSpec('$id.sprung', '$name sprung?', PinType.boolean),
@@ -263,6 +300,7 @@ Size controlBaseSize(ControlKind kind) => switch (kind) {
       ControlKind.slider => const Size(240, 76),
       ControlKind.toggle => const Size(110, 72),
       ControlKind.dpad => const Size(168, 168),
+      ControlKind.joystick => const Size(180, 180),
       ControlKind.light => const Size(80, 76),
       ControlKind.display => const Size(130, 80),
     };

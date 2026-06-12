@@ -34,6 +34,7 @@ IconData _iconFor(ControlKind kind) => switch (kind) {
       ControlKind.dpad => Icons.control_camera,
       ControlKind.slider => Icons.tune,
       ControlKind.toggle => Icons.toggle_on,
+      ControlKind.joystick => Icons.gamepad,
       ControlKind.light => Icons.lightbulb_outline,
       ControlKind.display => Icons.pin_outlined,
     };
@@ -43,6 +44,7 @@ String _describe(ControlKind kind) => switch (kind) {
       ControlKind.dpad => 'Four direction buttons in one',
       ControlKind.slider => 'Picks a number (0–100)',
       ControlKind.toggle => 'Switches between yes and no',
-      ControlKind.light => 'Shows a yes/no from your robot',
-      ControlKind.display => 'Shows a number from your robot',
+      ControlKind.joystick => 'Moves in 2D: X, Y, angle and distance',
+      ControlKind.light => 'Shows a colour from your robot',
+      ControlKind.display => 'Shows text from your robot',
     };

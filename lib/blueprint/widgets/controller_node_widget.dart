@@ -511,6 +511,32 @@ class _ControlVisual extends StatelessWidget {
             ),
           ],
         ),
+      ControlKind.joystick => Padding(
+          padding: const EdgeInsets.all(8),
+          child: AspectRatio(
+            aspectRatio: 1,
+            child: Container(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: const Color(0xFF2B313A),
+                border: Border.all(color: Colors.white24, width: 2),
+              ),
+              child: Center(
+                child: FractionallySizedBox(
+                  widthFactor: 0.34,
+                  heightFactor: 0.34,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Theme.of(context).colorScheme.primary,
+                      border: Border.all(color: Colors.white, width: 2),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
       ControlKind.dpad => Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [

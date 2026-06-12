@@ -419,7 +419,8 @@ class _BlueprintEditorState extends State<BlueprintEditor> {
               ListTile(
                 title: Text(control.name,
                     style: Theme.of(context).textTheme.titleMedium),
-                subtitle: Text(control.kind.label),
+                subtitle: Text('${control.kind.label} — '
+                    '${control.kind.rangeBlurb}'),
               ),
               // Live size sliders — the control resizes behind the sheet.
               _sheetSlider(
@@ -550,6 +551,47 @@ class _BlueprintEditorState extends State<BlueprintEditor> {
                     title: const Text('Sprung (stronger further out)'),
                     subtitle: const Text('Off = steady speed'),
                     value: control.sliderSprung,
+                    onChanged: (value) {
+                      _layout.setSliderConfig(control.id, 'sprung', value);
+                      setSheetState(() {});
+                    },
+                  ),
+                ],
+              ],
+              if (control.kind == ControlKind.joystick) ...[
+                SwitchListTile(
+                  key: const Key('control-joystick-powered'),
+                  secondary: const Icon(Icons.bolt),
+                  title: const Text('Springs back to centre'),
+                  subtitle: const Text('Off = stays where you leave it'),
+                  value: control.joystickPowered,
+                  onChanged: (value) {
+                    _layout.setSliderConfig(control.id, 'powered', value);
+                    setSheetState(() {});
+                  },
+                ),
+                if (control.joystickPowered) ...[
+                  _sheetSlider(
+                    key: const Key('control-joystick-strength'),
+                    icon: Icons.speed,
+                    label: 'Spring speed',
+                    value: control.joystickStrength.toDouble(),
+                    min: 0,
+                    max: 100,
+                    divisions: 100,
+                    display: '${control.joystickStrength}',
+                    onChanged: (value) {
+                      _layout.setSliderConfig(
+                          control.id, 'strength', value.round());
+                      setSheetState(() {});
+                    },
+                  ),
+                  SwitchListTile(
+                    key: const Key('control-joystick-sprung'),
+                    secondary: const Icon(Icons.waves),
+                    title: const Text('Sprung (stronger further out)'),
+                    subtitle: const Text('Off = steady speed'),
+                    value: control.joystickSprung,
                     onChanged: (value) {
                       _layout.setSliderConfig(control.id, 'sprung', value);
                       setSheetState(() {});

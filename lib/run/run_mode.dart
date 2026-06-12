@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart' show Ticker;
 
@@ -317,6 +319,8 @@ class _RunModeState extends State<RunMode>
                     _RunSlider(control: control, runner: _runner),
                   ControlKind.toggle =>
                     _RunToggle(control: control, runner: _runner),
+                  ControlKind.joystick =>
+                    _RunJoystick(control: control, runner: _runner),
                   ControlKind.light =>
                     _RunLight(control: control, runner: _runner),
                   ControlKind.display => const SizedBox.shrink(), // above
@@ -619,6 +623,106 @@ class _SliderPainter extends CustomPainter {
   @override
   bool shouldRepaint(_SliderPainter old) =>
       old.fraction != fraction || old.vertical != vertical || old.fill != fill;
+}
+
+/// A 2-axis joystick. Touch anywhere to move the stick there (clamped inside
+/// the circle); tracks the finger even outside the pad, and springs back to
+/// centre when released if powered. Reflects the runner's position live.
+class _RunJoystick extends StatelessWidget {
+  const _RunJoystick({required this.control, required this.runner});
+
+  final ControllerControl control;
+  final GraphRunner runner;
+
+  void _moveFromLocal(Offset local, Size size) {
+    final cx = size.width / 2;
+    final cy = size.height / 2;
+    final radius = math.min(cx, cy);
+    final vx = (local.dx - cx) / radius * 50;
+    final vy = -(local.dy - cy) / radius * 50; // up = positive
+    runner.joystickMoved(control.id, vx, vy);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final pos = runner.joystickPos(control.id);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final size = constraints.biggest;
+        return Listener(
+          onPointerDown: (e) {
+            runner.joystickTouchStart(control.id);
+            _moveFromLocal(e.localPosition, size);
+          },
+          onPointerMove: (e) => _moveFromLocal(e.localPosition, size),
+          onPointerUp: (_) => runner.joystickTouchEnd(control.id),
+          onPointerCancel: (_) => runner.joystickTouchEnd(control.id),
+          behavior: HitTestBehavior.opaque,
+          child: CustomPaint(
+            key: Key('run-control-${control.id}'),
+            size: Size.infinite,
+            painter: _JoystickPainter(
+              x: pos.x,
+              y: pos.y,
+              knob: Theme.of(context).colorScheme.primary,
+              label: control.showName ? control.name : null,
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _JoystickPainter extends CustomPainter {
+  _JoystickPainter(
+      {required this.x,
+      required this.y,
+      required this.knob,
+      required this.label});
+
+  final double x;
+  final double y;
+  final Color knob;
+  final String? label;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final centre = Offset(size.width / 2, size.height / 2);
+    final radius = math.min(size.width, size.height) / 2 - 8;
+    // Pad
+    canvas.drawCircle(centre, radius, Paint()..color = const Color(0xFF2B313A));
+    canvas.drawCircle(
+        centre,
+        radius,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2
+          ..color = Colors.white24);
+    // Stick
+    final knobPos = centre + Offset(x / 50 * radius, -y / 50 * radius);
+    canvas.drawCircle(knobPos, radius * 0.32, Paint()..color = knob);
+    canvas.drawCircle(
+        knobPos,
+        radius * 0.32,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2
+          ..color = Colors.white);
+    if (label != null) {
+      final tp = TextPainter(
+        text: TextSpan(
+            text: label, style: const TextStyle(color: Colors.white70)),
+        textDirection: TextDirection.ltr,
+      )..layout(maxWidth: size.width);
+      tp.paint(canvas,
+          Offset(centre.dx - tp.width / 2, size.height - tp.height));
+    }
+  }
+
+  @override
+  bool shouldRepaint(_JoystickPainter old) =>
+      old.x != x || old.y != y || old.knob != knob || old.label != label;
 }
 
 class _RunToggle extends StatelessWidget {

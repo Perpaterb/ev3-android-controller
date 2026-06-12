@@ -169,6 +169,34 @@ void main() {
     expect(int.parse(caption.split(': ').last), lessThan(10));
   });
 
+  testWidgets('touching a joystick moves it and updates its X output',
+      (tester) async {
+    final stick = addControl(ControlKind.joystick, 'Move');
+    final readout =
+        addControl(ControlKind.display, 'X', position: const Offset(0.5, 0.9));
+    seed(wireUp: (graph) {
+      final toStr = graph.addNode(nodeDefById('text.fromInt')!, Offset.zero);
+      graph.connect(PinRef(kControllerNodeId, '${stick.id}.x', isOutput: true),
+          PinRef(toStr.id, 'number', isOutput: false));
+      graph.connect(
+          PinRef(toStr.id, 'result', isOutput: true),
+          PinRef(kControllerNodeId, '${readout.id}.value', isOutput: false));
+    });
+    await pumpRunMode(tester);
+
+    String shown() => tester
+        .widget<Text>(find.byKey(Key('run-display-${readout.id}')))
+        .data!;
+    expect(shown(), '0'); // starts centred
+
+    // Touch the right edge of the pad → positive X. (No ticker in tests, so
+    // it doesn't spring back after release.)
+    final pad = tester.getRect(find.byKey(Key('run-control-${stick.id}')));
+    await tester.tapAt(Offset(pad.right - 6, pad.center.dy));
+    await tester.pump();
+    expect(int.parse(shown()), greaterThan(0));
+  });
+
   testWidgets('an unwired display shows --', (tester) async {
     addControl(ControlKind.display, 'Readout');
     seed();

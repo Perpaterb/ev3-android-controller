@@ -657,6 +657,101 @@ void main() {
     });
   });
 
+  group('joystick', () {
+    test('x/y read live and angle/distance derive from them', () {
+      final stick = addControl(ControlKind.joystick, 'Move');
+      syncController();
+      final dx = addControl(ControlKind.display, 'X');
+      final dy = addControl(ControlKind.display, 'Y');
+      final da = addControl(ControlKind.display, 'A');
+      final dd = addControl(ControlKind.display, 'D');
+      syncController();
+      void wireOut(String pin, ControllerControl display) {
+        final toStr = node('text.fromInt');
+        wire(kControllerNodeId, '${stick.id}.$pin', toStr.id, 'number');
+        wire(toStr.id, 'result', kControllerNodeId, '${display.id}.value');
+      }
+
+      wireOut('x', dx);
+      wireOut('y', dy);
+      wireOut('angle', da);
+      wireOut('distance', dd);
+
+      final r = runner();
+      expect(r.joystickX(stick.id), 0);
+      expect(r.joystickY(stick.id), 0);
+
+      r.joystickMoved(stick.id, 50, 0); // full right
+      expect(r.displayValue(dx.id), '50');
+      expect(r.displayValue(dy.id), '0');
+      expect(r.displayValue(da.id), '90'); // right = 90°
+      expect(r.displayValue(dd.id), '100');
+
+      r.joystickMoved(stick.id, 0, 50); // full up
+      expect(r.displayValue(da.id), '0'); // up = 0°
+    });
+
+    test('movement is clamped inside the circle', () {
+      final stick = addControl(ControlKind.joystick, 'Move');
+      syncController();
+      final r = runner();
+      r.joystickMoved(stick.id, 50, 50); // corner — outside the circle
+      final mag = (r.joystickX(stick.id) * r.joystickX(stick.id) +
+              r.joystickY(stick.id) * r.joystickY(stick.id))
+          .toDouble();
+      // Magnitude can't exceed 50 (allow rounding slop).
+      expect(mag, lessThanOrEqualTo(50 * 50 + 2));
+      expect(r.joystickDistance(stick.id), 100);
+    });
+
+    test('a powered joystick springs back to centre', () {
+      final stick = addControl(ControlKind.joystick, 'Move');
+      syncController(); // powered + sprung by default
+      final r = runner();
+      r.joystickMoved(stick.id, 40, 30);
+      for (var i = 0; i < 400; i++) {
+        r.tick();
+      }
+      expect(r.joystickX(stick.id), 0);
+      expect(r.joystickY(stick.id), 0);
+    });
+
+    test('spring is suspended while touched', () {
+      final stick = addControl(ControlKind.joystick, 'Move');
+      syncController();
+      final r = runner();
+      r.joystickTouchStart(stick.id);
+      r.joystickMoved(stick.id, 40, 0);
+      for (var i = 0; i < 50; i++) {
+        r.tick();
+      }
+      expect(r.joystickX(stick.id), 40);
+      r.joystickTouchEnd(stick.id);
+      for (var i = 0; i < 400; i++) {
+        r.tick();
+      }
+      expect(r.joystickX(stick.id), 0);
+    });
+
+    test('set-position jumps the stick on power', () {
+      final go = addControl(ControlKind.button, 'Go');
+      final stick = addControl(ControlKind.joystick, 'Move');
+      layout.setSliderConfig(stick.id, 'powered', false); // hold position
+      syncController();
+      final sx = node('value.int', {'value': 30});
+      final sy = node('value.int', {'value': -20});
+      wire(sx.id, 'value', kControllerNodeId, '${stick.id}.setX');
+      wire(sy.id, 'value', kControllerNodeId, '${stick.id}.setY');
+      wire(kControllerNodeId, '${go.id}.pressed', kControllerNodeId,
+          '${stick.id}.setPos');
+
+      final r = runner();
+      r.buttonPressed(go.id);
+      expect(r.joystickX(stick.id), 30);
+      expect(r.joystickY(stick.id), -20);
+    });
+  });
+
   group('tick model', () {
     test('Every Tick fires power each tick', () {
       final go = addControl(ControlKind.button, 'Go'); // just to have a brick
