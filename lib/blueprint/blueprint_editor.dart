@@ -232,6 +232,19 @@ class _BlueprintEditorState extends State<BlueprintEditor> {
     return from != null && (ref == from || _canLink(from, ref));
   }
 
+  /// True if any wire touches this pin (drives the filled-vs-ring look).
+  bool _pinConnected(PinRef ref) => _graph.wires.any(
+      (w) => ref.isOutput ? w.from == ref : w.to == ref);
+
+  /// True if this pin is already wired to the pin currently selected for
+  /// wiring (gets the orange "linked" glow).
+  bool _pinLinked(PinRef ref) {
+    final from = _wiringFrom;
+    if (from == null || ref == from) return false;
+    return _graph.wires.any((w) =>
+        (w.from == from && w.to == ref) || (w.to == from && w.from == ref));
+  }
+
   bool _nodeDimmed(GraphNode node) {
     final from = _wiringFrom;
     if (from == null || node.id == from.nodeId) return false;
@@ -1054,6 +1067,7 @@ class _BlueprintEditorState extends State<BlueprintEditor> {
                           graph: _graph,
                           viewport: viewport,
                           faded: _wiringFrom != null,
+                          selected: _wiringFrom,
                         ),
                       ),
                     ),
@@ -1111,6 +1125,8 @@ class _BlueprintEditorState extends State<BlueprintEditor> {
             dimmed: _nodeDimmed(node),
             wiringActive: _wiringFrom != null,
             pinHighlighted: _pinHighlighted,
+            pinConnected: _pinConnected,
+            pinLinked: _pinLinked,
             onSelect: () => setState(() => _selectedNodeId = node.id),
             onMoveBy: (delta) => _graph.moveNode(node.id, delta),
             onRename: () => _renameNode(node),
@@ -1130,6 +1146,8 @@ class _BlueprintEditorState extends State<BlueprintEditor> {
             dimmed: _nodeDimmed(node),
             wiringActive: _wiringFrom != null,
             pinHighlighted: _pinHighlighted,
+            pinConnected: _pinConnected,
+            pinLinked: _pinLinked,
             onSelect: () => setState(() => _selectedNodeId = node.id),
             onMoveBy: (delta) => _graph.moveNode(node.id, delta),
             onRename: () => _renameNode(node),

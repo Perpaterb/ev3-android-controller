@@ -21,6 +21,8 @@ class NodeWidget extends StatelessWidget {
     required this.dimmed,
     required this.wiringActive,
     required this.pinHighlighted,
+    required this.pinConnected,
+    required this.pinLinked,
     required this.onSelect,
     required this.onMoveBy,
     required this.onRename,
@@ -37,6 +39,8 @@ class NodeWidget extends StatelessWidget {
   final bool dimmed;
   final bool wiringActive;
   final bool Function(PinRef ref) pinHighlighted;
+  final bool Function(PinRef ref) pinConnected;
+  final bool Function(PinRef ref) pinLinked;
 
   final VoidCallback onSelect;
   final void Function(Offset canvasDelta) onMoveBy;
@@ -169,11 +173,14 @@ class NodeWidget extends StatelessWidget {
   Widget _buildPin(PinSpec spec, {required bool isOutput}) {
     final ref = PinRef(node.id, spec.id, isOutput: isOutput);
     final highlighted = pinHighlighted(ref);
+    final linked = pinLinked(ref);
     return PinDot(
       key: Key('pin-${node.id}-${spec.id}-${isOutput ? 'out' : 'in'}'),
       type: spec.type,
       highlighted: highlighted,
-      faded: wiringActive && !highlighted,
+      linked: linked,
+      connected: pinConnected(ref),
+      faded: wiringActive && !highlighted && !linked,
       onTap: () => onTapPin(ref),
       onLongPress: () => onLongPressPin(ref),
     );

@@ -23,6 +23,8 @@ class ControllerNodeWidget extends StatefulWidget {
     required this.dimmed,
     required this.wiringActive,
     required this.pinHighlighted,
+    required this.pinConnected,
+    required this.pinLinked,
     required this.onSelect,
     required this.onMoveBy,
     required this.onRename,
@@ -41,6 +43,8 @@ class ControllerNodeWidget extends StatefulWidget {
   final bool dimmed;
   final bool wiringActive;
   final bool Function(PinRef ref) pinHighlighted;
+  final bool Function(PinRef ref) pinConnected;
+  final bool Function(PinRef ref) pinLinked;
 
   final VoidCallback onSelect;
   final void Function(Offset canvasDelta) onMoveBy;
@@ -233,11 +237,14 @@ class _ControllerNodeWidgetState extends State<ControllerNodeWidget> {
   Widget _buildPin(PinSpec spec, {required bool isOutput}) {
     final ref = PinRef(widget.node.id, spec.id, isOutput: isOutput);
     final highlighted = widget.pinHighlighted(ref);
+    final linked = widget.pinLinked(ref);
     return PinDot(
       key: Key('pin-${widget.node.id}-${spec.id}-${isOutput ? 'out' : 'in'}'),
       type: spec.type,
       highlighted: highlighted,
-      faded: widget.wiringActive && !highlighted,
+      linked: linked,
+      connected: widget.pinConnected(ref),
+      faded: widget.wiringActive && !highlighted && !linked,
       onTap: () => widget.onTapPin(ref),
       onLongPress: () => widget.onLongPressPin(ref),
       rowHeight: kControllerPinRowHeight,
